@@ -99,7 +99,7 @@ const INDIAN_STATES = [
 ]
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "team" | "billing">("profile")
+  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "team">("profile")
   
   // Data States
   const [business, setBusiness] = React.useState<BusinessProfile | null>(null)
@@ -359,7 +359,7 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-extrabold tracking-tight">System Settings</h1>
           <p className="text-slate-400 text-xs mt-1">Manage business metadata, custom invoice layouts, payments settings, and system billing.</p>
         </div>
-        {activeTab !== "notifications" && activeTab !== "team" && activeTab !== "billing" && (
+        {activeTab !== "notifications" && activeTab !== "team" && (
           <button
             onClick={saveBusinessProfile}
             disabled={isSaving}
@@ -391,7 +391,6 @@ export default function SettingsPage() {
             { id: "payment", label: "Payment Settings", icon: CreditCard },
             { id: "notifications", label: "Notifications", icon: Bell },
             { id: "team", label: "Team Members", icon: Users },
-            { id: "billing", label: "Billing & Plans", icon: ShieldCheck },
           ].map((tab) => {
             const Icon = tab.icon
             return (
@@ -1108,67 +1107,7 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* TAB 6: SUBSCRIPTION & BILLING */}
-          {activeTab === "billing" && (
-            <div className="space-y-6">
-              {/* Current plan card */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-800 pb-3">Subscription Tier</h3>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-950 p-4 rounded-lg border border-slate-850">
-                  <div className="space-y-1">
-                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Current Plan</span>
-                    <span className="text-base font-extrabold text-white flex items-center gap-2">
-                      {subscription?.plan.toUpperCase()} PLAN
-                      <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 rounded-full">
-                        Active
-                      </span>
-                    </span>
-                    <span className="text-[11px] text-slate-450 block">Renews automatically on 15 Feb 2026</span>
-                  </div>
-                  <a
-                    href="/pricing"
-                    className="inline-flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-lg transition-colors"
-                  >
-                    Upgrade Plan
-                  </a>
-                </div>
-              </div>
 
-              {/* Monthly usage details */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-800 pb-3">Monthly Resource Usage</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="p-3.5 bg-slate-950/40 rounded-lg border border-slate-850 space-y-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-slate-400">Invoices generated</span>
-                      <span className="font-mono font-bold text-white">3 / 5</span>
-                    </div>
-                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-indigo-500 h-full rounded-full" style={{ width: "60%" }}></div>
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 bg-slate-950/40 rounded-lg border border-slate-850 space-y-2">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="font-semibold text-slate-400">Clients seat</span>
-                      <span className="font-mono font-bold text-white">1 / 1</span>
-                    </div>
-                    <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden">
-                      <div className="bg-amber-500 h-full rounded-full" style={{ width: "100%" }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment History Log */}
-              <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 shadow-xl space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-800 pb-3">Billing History</h3>
-                <div className="text-center py-6 text-slate-500 text-xs italic">
-                  No subscription invoice payments found. You are currently on the Free tier.
-                </div>
-              </div>
-            </div>
-          )}
 
         </div>
       </div>

@@ -16,19 +16,19 @@ export default function RefundPolicyPage() {
             Thank you for choosing CollectBot. Please read this policy carefully regarding cancellations and refund terms.
           </p>
 
-          <h3 className="text-sm font-bold text-white pt-2">1. Subscription Cancellation</h3>
+          <h3 className="text-sm font-bold text-white pt-2">1. Usage Policy</h3>
           <p>
-            You can cancel your subscription at any time inside the settings billing tab. Upon cancellation, your plan access continues until the end of your current billing period. No further renewals are charged.
+            CollectBot is currently available for usage with no restrictions. No subscription fees are processed at this stage.
           </p>
 
-          <h3 className="text-sm font-bold text-white pt-2">2. Refund Terms</h3>
+          <h3 className="text-sm font-bold text-white pt-2">2. Future Billing Updates</h3>
           <p>
-            Because we offer a fully featured Free tier to evaluate the platform, subscription fees paid for Solo, Business, or Scale plans are generally non-refundable once processed.
+            Should premium tiers or standard subscription services be introduced, cancellation methods and refund options will be updated here.
           </p>
 
-          <h3 className="text-sm font-bold text-white pt-2">3. Exceptions</h3>
+          <h3 className="text-sm font-bold text-white pt-2">3. Exceptions & Support</h3>
           <p>
-            In the event of accidental double-billing or billing system failures on our part, please report details to: <strong>support@collectbot.in</strong>. Valid discrepancies will be refunded within 5-7 business days to your original payment method.
+            For any queries or assistance, please reach out to us at: <strong>support@collectbot.in</strong>.
           </p>
         </div>
       </div>

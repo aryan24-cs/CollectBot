@@ -24,7 +24,6 @@ export default function LandingPage() {
           CollectBot
         </Link>
         <div className="flex items-center gap-6">
-          <Link href="/pricing" className="text-xs font-bold text-slate-400 hover:text-white transition-colors">Pricing</Link>
           <Link href="/login" className="text-xs font-bold text-slate-400 hover:text-white transition-colors">Sign In</Link>
           <Link href="/register" className="bg-indigo-650 hover:bg-indigo-600 text-white text-xs font-bold px-3.5 py-1.5 rounded-lg transition-all shadow-lg shadow-indigo-650/10">
             Get Started Free
@@ -49,8 +48,8 @@ export default function LandingPage() {
             Start Collecting Free
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
-          <Link href="/pricing" className="text-xs font-bold text-slate-400 hover:text-white transition-colors">
-            See Pricing Plans →
+          <Link href="/login" className="text-xs font-bold text-slate-400 hover:text-white transition-colors">
+            Sign In to Dashboard →
           </Link>
         </div>
 
