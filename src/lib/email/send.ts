@@ -1,14 +1,15 @@
-import { resend } from "./client"
+import { transporter } from "./client"
 import { InvoiceEmail } from "./templates/InvoiceEmail"
 import { ReminderEmail } from "./templates/ReminderEmail"
 import { ReceiptEmail } from "./templates/ReceiptEmail"
 import { ThankYouEmail } from "./templates/ThankYouEmail"
+import { renderToStaticMarkup } from "react-dom/server"
 
-// Fallback sender address for testing (Resend Sandbox)
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "CollectBot <onboarding@resend.dev>"
+// Fallback sender address for testing (SMTP verified sender)
+const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "CollectBot <billing@yourdomain.com>"
 
 /**
- * Downloads a remote file (e.g., Supabase Storage PDF) to attach to Resend emails.
+ * Downloads a remote file (e.g., Supabase Storage PDF) to attach to emails.
  */
 async function getAttachmentBuffer(url: string): Promise<Buffer | null> {
   try {
@@ -56,19 +57,17 @@ export async function sendInvoiceEmail({
     }
   }
 
-  const { data, error } = await resend.emails.send({
+  const html = renderToStaticMarkup(InvoiceEmail({ businessName, ...props }))
+
+  await transporter.sendMail({
     from: FROM_EMAIL,
     to,
     subject,
-    react: InvoiceEmail({ businessName, ...props }),
+    html,
     attachments,
   })
 
-  if (error) {
-    throw new Error(`Resend sendInvoiceEmail failed: ${error.message}`)
-  }
-
-  console.log(`Invoice email sent successfully to ${to} (ID: ${data?.id})`)
+  console.log(`Invoice email sent successfully via SMTP to ${to}`)
 }
 
 interface SendReminderEmailParams {
@@ -96,18 +95,16 @@ export async function sendReminderEmail({
     subject = `URGENT: Invoice ${props.invoiceNumber} is ${daysLabel}overdue`
   }
 
-  const { data, error } = await resend.emails.send({
+  const html = renderToStaticMarkup(ReminderEmail({ reminderType, ...props }))
+
+  await transporter.sendMail({
     from: FROM_EMAIL,
     to,
     subject,
-    react: ReminderEmail({ reminderType, ...props }),
+    html,
   })
 
-  if (error) {
-    throw new Error(`Resend sendReminderEmail failed: ${error.message}`)
-  }
-
-  console.log(`Reminder email (${reminderType}) sent successfully to ${to} (ID: ${data?.id})`)
+  console.log(`Reminder email (${reminderType}) sent successfully via SMTP to ${to}`)
 }
 
 interface SendReceiptEmailParams {
@@ -140,19 +137,17 @@ export async function sendReceiptEmail({
     }
   }
 
-  const { data, error } = await resend.emails.send({
+  const html = renderToStaticMarkup(ReceiptEmail({ receiptUrl, ...props }))
+
+  await transporter.sendMail({
     from: FROM_EMAIL,
     to,
     subject,
-    react: ReceiptEmail({ receiptUrl, ...props }),
+    html,
     attachments,
   })
 
-  if (error) {
-    throw new Error(`Resend sendReceiptEmail failed: ${error.message}`)
-  }
-
-  console.log(`Receipt email sent successfully to ${to} (ID: ${data?.id})`)
+  console.log(`Receipt email sent successfully via SMTP to ${to}`)
 }
 
 interface SendOwnerPaymentAlertParams {
@@ -199,16 +194,12 @@ export async function sendOwnerPaymentAlert({
     </div>
   `
 
-  const { data, error } = await resend.emails.send({
+  await transporter.sendMail({
     from: FROM_EMAIL,
     to,
     subject,
     html: htmlContent,
   })
 
-  if (error) {
-    throw new Error(`Resend sendOwnerPaymentAlert failed: ${error.message}`)
-  }
-
-  console.log(`Owner payment alert email sent successfully to ${to} (ID: ${data?.id})`)
+  console.log(`Owner payment alert email sent successfully via SMTP to ${to}`)
 }

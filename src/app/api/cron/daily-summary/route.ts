@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
-import { resend } from "@/lib/email/client"
+import { transporter } from "@/lib/email/client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,7 +78,8 @@ export async function GET(request: NextRequest) {
 
       // D. Send email summary
       const dashboardLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/dashboard`
-      const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "CollectBot <onboarding@resend.dev>"
+      // Fallback sender address for testing (SMTP verified sender)
+const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "CollectBot <billing@yourdomain.com>"
 
       const subject = `📊 Today's Summary — ${business.name}`
       const htmlContent = `
@@ -121,7 +122,7 @@ export async function GET(request: NextRequest) {
         </div>
       `
 
-      await resend.emails.send({
+      await transporter.sendMail({
         from: FROM_EMAIL,
         to: business.email,
         subject,

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import getSupabaseServerClient from "@/lib/supabase/server"
 import { checkPlanLimit } from "@/lib/billing/planLimits"
-import { resend } from "@/lib/email/client"
+import { transporter } from "@/lib/email/client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -98,11 +98,11 @@ export async function POST(request: NextRequest) {
 
     if (insertErr) throw insertErr
 
-    // 4. Send Invite Email via Resend
+    // 4. Send Invite Email via Nodemailer
     const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/register?invite=${newMember.id}`
-    const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "CollectBot <onboarding@resend.dev>"
+    const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "CollectBot <billing@yourdomain.com>"
     
-    await resend.emails.send({
+    await transporter.sendMail({
       from: FROM_EMAIL,
       to: email,
       subject: `✉️ Invitation to join ${business.name} on CollectBot`,

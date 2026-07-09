@@ -7,7 +7,7 @@ import {
   sendFinalWarning,
 } from "../whatsapp/templates"
 import { sendReminderEmail } from "../email/send"
-import { resend } from "../email/client"
+import { transporter } from "../email/client"
 
 // Custom type mappings
 type ReminderType =
@@ -307,7 +307,7 @@ export async function processAllReminders(): Promise<ProcessingResult> {
     // 8. Escalation for 14 days overdue: Notify the business owner
     if (reminderType === "14_after" && invoice.business.email) {
       try {
-        await resend.emails.send({
+        await transporter.sendMail({
           from: FROM_EMAIL_FALLBACK(invoice.business.email),
           to: invoice.business.email,
           subject: `⚠️ URGENT: Invoice ${invoice.invoice_number} is 14 Days Overdue`,
