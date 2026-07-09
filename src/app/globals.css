@@ -128,3 +128,35 @@
     @apply font-sans;
   }
 }
+
+@media print {
+  body, html {
+    background: white !important;
+    color: black !important;
+  }
+  header, footer, nav, aside, button, .no-print, [role="navigation"], .lg\:pl-60 > header, .w-60, .lg\:col-span-5 {
+    display: none !important;
+  }
+  .lg\:pl-60 {
+    padding-left: 0 !important;
+  }
+  .max-w-7xl {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .lg\:col-span-7 {
+    width: 100% !important;
+    max-width: 100% !important;
+    grid-column: span 12 / span 12 !important;
+  }
+  .bg-slate-905, .bg-slate-900\/60, .shadow-2xl {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

@@ -258,9 +258,53 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
-        <p className="text-slate-400">Syncing dashboard logs...</p>
+      <div className="space-y-6 animate-pulse select-none">
+        {/* Header skeleton */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="space-y-2">
+            <div className="h-8 w-48 bg-slate-900 rounded-lg"></div>
+            <div className="h-4 w-64 bg-slate-900/60 rounded-lg"></div>
+          </div>
+          <div className="flex gap-2">
+            <div className="h-9 w-24 bg-slate-900 rounded-lg"></div>
+            <div className="h-9 w-24 bg-slate-900 rounded-lg"></div>
+          </div>
+        </div>
+
+        {/* Stats Grid skeleton */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="border border-slate-900 bg-slate-900/60 p-4 rounded-xl shadow-xl h-24 space-y-3">
+              <div className="flex justify-between items-center">
+                <div className="h-4 w-20 bg-slate-950 rounded"></div>
+                <div className="h-7 w-7 bg-slate-950 rounded-lg"></div>
+              </div>
+              <div className="h-6 w-28 bg-slate-950 rounded"></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart & Activity Grid skeleton */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-8 border border-slate-900 bg-slate-900/60 rounded-xl p-5 shadow-xl h-80 space-y-4">
+            <div className="h-5 w-40 bg-slate-950 rounded"></div>
+            <div className="h-56 bg-slate-950 rounded-lg"></div>
+          </div>
+          <div className="lg:col-span-4 border border-slate-900 bg-slate-900/60 rounded-xl p-5 shadow-xl h-80 space-y-4">
+            <div className="h-5 w-40 bg-slate-950 rounded"></div>
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex gap-3 items-center">
+                  <div className="w-8 h-8 rounded-lg bg-slate-950 shrink-0"></div>
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3 w-32 bg-slate-950 rounded"></div>
+                    <div className="h-2 w-20 bg-slate-950 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner"
+import { validateEnv } from "@/lib/env"
+
+// Validate environmental variables at module load (boot/startup)
+validateEnv()
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -19,7 +19,8 @@ import {
   Play,
   Pause,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Printer
 } from "lucide-react"
 import { toast } from "sonner"
 
@@ -385,6 +386,14 @@ export default function InvoiceDetailsPage() {
               >
                 <Download className="w-3.5 h-3.5" />
                 View PDF
+              </Button>
+              <Button
+                variant="outline"
+                className="border-slate-800 text-slate-350 hover:bg-slate-800 hover:text-white text-xs gap-1.5"
+                onClick={() => window.print()}
+              >
+                <Printer className="w-3.5 h-3.5" />
+                Print
               </Button>
               <Button
                 variant="outline"

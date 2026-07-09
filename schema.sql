@@ -319,16 +319,106 @@ CREATE TRIGGER update_invoices_updated_at
   BEFORE UPDATE ON invoices
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Auto-create notification settings when business created
-CREATE OR REPLACE FUNCTION create_default_notification_settings()
+-- Auto-create subscription and notification settings when business created
+CREATE OR REPLACE FUNCTION create_default_business_assets()
 RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO notification_settings (business_id)
   VALUES (NEW.id);
+  
+  INSERT INTO subscriptions (business_id, plan, billing_cycle, status)
+  VALUES (NEW.id, 'free', 'monthly', 'active');
+  
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER create_notification_settings_on_business_create
+CREATE TRIGGER create_assets_on_business_create
   AFTER INSERT ON businesses
-  FOR EACH ROW EXECUTE FUNCTION create_default_notification_settings();
+  FOR EACH ROW EXECUTE FUNCTION create_default_business_assets();
+
+-- ─────────────────────────────────────────
+-- TABLE additions for Phase 5
+-- ─────────────────────────────────────────
+
+-- 1. Subscriptions Table
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id          UUID REFERENCES businesses(id) ON DELETE CASCADE UNIQUE,
+  plan                 TEXT DEFAULT 'free' CHECK (plan IN ('free','solo','business','scale')),
+  billing_cycle        TEXT DEFAULT 'monthly' CHECK (billing_cycle IN ('monthly','yearly')),
+  status               TEXT DEFAULT 'active' CHECK (status IN ('active','cancelled','expired','trial')),
+  razorpay_sub_id      TEXT,
+  current_period_start TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  current_period_end   TIMESTAMP WITH TIME ZONE DEFAULT (NOW() + INTERVAL '30 days'),
+  trial_ends_at        TIMESTAMP WITH TIME ZONE,
+  cancelled_at         TIMESTAMP WITH TIME ZONE,
+  created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 2. Team Members Table
+CREATE TABLE IF NOT EXISTS team_members (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  user_id     UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  email       TEXT NOT NULL,
+  role        TEXT DEFAULT 'viewer' CHECK (role IN ('owner','manager','viewer')),
+  status      TEXT DEFAULT 'pending' CHECK (status IN ('pending','active')),
+  invited_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  joined_at   TIMESTAMP WITH TIME ZONE,
+  created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Alter businesses table to add invoice template configurations and customization defaults
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS default_payment_terms INTEGER DEFAULT 7;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS default_tax_rate NUMERIC DEFAULT 0;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS default_notes TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS default_terms TEXT;
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS invoice_template TEXT DEFAULT 'modern';
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS primary_color TEXT DEFAULT 'blue';
+ALTER TABLE businesses ADD COLUMN IF NOT EXISTS font_family TEXT DEFAULT 'Inter';
+
+-- Enable RLS Policies on new tables
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE team_members ENABLE ROW LEVEL SECURITY;
+
+-- Subscriptions RLS
+CREATE POLICY "Users can manage own subscription" ON subscriptions
+  FOR ALL USING (
+    business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+-- Team members RLS
+CREATE POLICY "Owners can manage team members" ON team_members
+  FOR ALL USING (
+    business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Team members can view roster" ON team_members
+  FOR SELECT USING (
+    business_id IN (
+      SELECT business_id FROM team_members WHERE user_id = auth.uid()
+    ) OR business_id IN (
+      SELECT id FROM businesses WHERE user_id = auth.uid()
+    )
+  );
+
+-- ─────────────────────────────────────────
+-- PERFORMANCE OPTIMIZATION INDEXES
+-- ─────────────────────────────────────────
+
+CREATE INDEX IF NOT EXISTS idx_invoices_business_id ON invoices(business_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
+CREATE INDEX IF NOT EXISTS idx_invoices_client_id ON invoices(client_id);
+CREATE INDEX IF NOT EXISTS idx_clients_business_id ON clients(business_id);
+CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_logs_invoice_id ON reminder_logs(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_logs_sent_at ON reminder_logs(sent_at);
+CREATE INDEX IF NOT EXISTS idx_invoices_reminder_check ON invoices(status, reminder_paused, due_date);

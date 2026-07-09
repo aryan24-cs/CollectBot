@@ -7,6 +7,8 @@ import Header from "@/components/layout/Header"
 import MobileNav from "@/components/layout/MobileNav"
 import { Button } from "@/components/ui/button"
 
+import { useRouter } from "next/navigation"
+
 interface LayoutClientProps {
   businessName: string
   userEmail: string
@@ -20,12 +22,46 @@ export default function DashboardLayoutClient({
   userName,
   children,
 }: LayoutClientProps) {
+  const router = useRouter()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false)
 
   // Close mobile menu on path changes
   React.useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [])
+
+  // Mount global keyboard shortcuts
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable
+      ) {
+        return
+      }
+
+      const key = e.key.toLowerCase()
+
+      if (key === "n") {
+        e.preventDefault()
+        router.push("/invoices/new")
+      } else if (key === "c") {
+        e.preventDefault()
+        router.push("/clients/new")
+      } else if (e.key === "/") {
+        const searchInput = document.querySelector('input[placeholder*="Search" i]') as HTMLInputElement
+        if (searchInput) {
+          e.preventDefault()
+          searchInput.focus()
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [router])
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row">
