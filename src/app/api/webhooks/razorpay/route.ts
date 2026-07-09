@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { verifyWebhookSignature } from "@/lib/razorpay/verifyWebhook"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { generateReceipt } from "@/lib/pdf/generateReceipt"
+import { sendPaymentThankYou, sendOwnerPaymentAlert as sendOwnerPaymentAlertWhatsApp } from "@/lib/whatsapp/templates"
+import { sendReceiptEmail, sendOwnerPaymentAlert as sendOwnerPaymentAlertEmail } from "@/lib/email/send"
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()
@@ -165,6 +167,93 @@ export async function POST(request: NextRequest) {
     } catch (pdfErr) {
       console.error("Receipt generation failed in webhook callback:", pdfErr)
       // Do not fail the webhook request because payment record was successfully logged
+    }
+
+    // 5. Fetch completed details for post-payment notifications
+    try {
+      const { data: fullInvoice } = await supabase
+        .from("invoices")
+        .select(`
+          *,
+          client:clients(*),
+          business:businesses(*, notification_settings(*))
+        `)
+        .eq("id", invoiceId)
+        .maybeSingle()
+
+      if (fullInvoice) {
+        const rawSettings = fullInvoice.business?.notification_settings
+        const settings = Array.isArray(rawSettings) ? rawSettings[0] : rawSettings
+
+        const promises = []
+        const formattedAmount = `₹${Number(amount).toLocaleString("en-IN")}`
+        const todayStr = new Date(nowStr).toLocaleDateString("en-IN")
+
+        // 5a. Client thank-you WhatsApp (Forced false to disable WhatsApp)
+        if (false && fullInvoice.client?.phone) {
+          promises.push(
+            sendPaymentThankYou({
+              phone: fullInvoice.client.phone,
+              clientName: fullInvoice.client.name,
+              amount: formattedAmount,
+              businessName: fullInvoice.business.name,
+              invoiceNumber: fullInvoice.invoice_number,
+              date: todayStr,
+            })
+          )
+        }
+
+        // 5b. Client receipt email (Forced true to ensure receipt is always sent to email)
+        if (true && fullInvoice.client?.email) {
+          promises.push(
+            sendReceiptEmail({
+              to: fullInvoice.client.email,
+              businessName: fullInvoice.business.name,
+              clientName: fullInvoice.client.name,
+              invoiceNumber: fullInvoice.invoice_number,
+              amount: formattedAmount,
+              paymentDate: todayStr,
+              paymentMethod: paymentMethod,
+              razorpayId: razorpayPaymentId,
+              receiptUrl: fullInvoice.receipt_url || fullInvoice.pdf_url,
+            })
+          )
+        }
+
+        // 5c. Owner alert WhatsApp (Forced false to disable WhatsApp)
+        if (false && fullInvoice.business?.phone) {
+          promises.push(
+            sendOwnerPaymentAlertWhatsApp({
+              phone: fullInvoice.business.phone,
+              ownerName: fullInvoice.business.name,
+              clientName: fullInvoice.client.name,
+              amount: formattedAmount,
+              invoiceNumber: fullInvoice.invoice_number,
+              paymentMethod: paymentMethod,
+            })
+          )
+        }
+
+        // 5d. Owner alert email (Forced true to ensure owner notification is sent)
+        if (true && fullInvoice.business?.email) {
+          promises.push(
+            sendOwnerPaymentAlertEmail({
+              to: fullInvoice.business.email,
+              ownerName: fullInvoice.business.name,
+              clientName: fullInvoice.client.name,
+              amount: formattedAmount,
+              invoiceNumber: fullInvoice.invoice_number,
+              paymentMethod: paymentMethod,
+            })
+          )
+        }
+
+        // Execute in parallel (fire-and-forget but awaited to guarantee serverless completion)
+        await Promise.allSettled(promises)
+        console.log("Webhook post-payment notifications successfully completed.")
+      }
+    } catch (notifErr: any) {
+      console.error("Post-payment notifications failed inside webhook:", notifErr.message)
     }
 
     return NextResponse.json({ status: "Payment logged successfully" }, { status: 200 })

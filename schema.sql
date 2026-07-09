@@ -157,7 +157,8 @@ CREATE TABLE reminder_logs (
                   CHECK (reminder_type IN (
                     '7_before','3_before','1_before',
                     'due_day','1_after','3_after',
-                    '7_after','14_after'
+                    '7_after','14_after',
+                    'invoice_sent','manual'
                   )),
   channel         TEXT NOT NULL
                   CHECK (channel IN ('whatsapp','email','sms')),

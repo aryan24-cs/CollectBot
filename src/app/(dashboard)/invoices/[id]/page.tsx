@@ -57,6 +57,10 @@ export default function InvoiceDetailsPage() {
   const [manualMethod, setManualMethod] = React.useState("cash")
   const [manualNotes, setManualNotes] = React.useState("")
 
+  // Manual reminder form states
+  const [isRemindOpen, setIsRemindOpen] = React.useState(false)
+  const [remindChannel, setRemindChannel] = React.useState("both")
+
   React.useEffect(() => {
     if (invoice) {
       setManualAmount(String(invoice.balance_due ?? invoice.total))
@@ -253,13 +257,29 @@ export default function InvoiceDetailsPage() {
     }
   }
 
-  // Send Manual reminder stub
-  const triggerManualReminder = async () => {
-    toast.loading("Queuing WhatsApp reminder...")
-    setTimeout(() => {
-      toast.dismiss()
-      toast.success("WhatsApp template reminder sent successfully!")
-    }, 1500)
+  // Send Manual reminder API call
+  const handleManualReminderSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsProcessing(true)
+    const toastId = toast.loading("Sending reminder...")
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/remind`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: remindChannel }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to trigger reminder")
+
+      toast.success(`Reminder successfully sent via ${data.sentVia.join(" and ")}!`)
+      setIsRemindOpen(false)
+      fetchInvoiceDetails()
+    } catch (err: any) {
+      toast.error(err.message || "Could not dispatch reminder.")
+    } finally {
+      toast.dismiss(toastId)
+      setIsProcessing(false)
+    }
   }
 
   // Trigger PDF Build API call (Module 3)
@@ -369,10 +389,10 @@ export default function InvoiceDetailsPage() {
               <Button
                 variant="outline"
                 className="border-indigo-500/20 text-indigo-400 hover:text-white hover:bg-indigo-950/20 text-xs gap-1.5"
-                onClick={triggerManualReminder}
+                onClick={() => setIsRemindOpen(true)}
               >
                 <MessageSquare className="w-3.5 h-3.5" />
-                WhatsApp Alert
+                Send Reminder
               </Button>
               <Button
                 variant="default"
@@ -766,6 +786,79 @@ export default function InvoiceDetailsPage() {
                 disabled={isProcessing}
               >
                 Mark as Paid
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Reminder Dialog */}
+      <Dialog open={isRemindOpen} onOpenChange={setIsRemindOpen}>
+        <DialogContent className="bg-slate-900 border-slate-800 text-white max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white text-base">Send Payment Reminder</DialogTitle>
+            <DialogDescription className="text-slate-400 text-xs">
+              Select notification channels to nudge the client for payment.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleManualReminderSubmit} className="space-y-4 pt-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-slate-400">Choose Notification Channels</Label>
+              <Select value={remindChannel} onValueChange={(val) => setRemindChannel(val || "both")}>
+                <SelectTrigger className="w-full bg-slate-950 border-slate-800 text-white text-xs h-8">
+                  <SelectValue placeholder="Select Channels" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-950 border-slate-800 text-white">
+                  <SelectItem value="both">WhatsApp & Email</SelectItem>
+                  <SelectItem value="whatsapp">WhatsApp Only</SelectItem>
+                  <SelectItem value="email">Email Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Template Previews based on invoice due state */}
+            <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-2">
+              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Message Preview</span>
+              {new Date() > new Date(invoice?.due_date || "") ? (
+                <div className="space-y-2">
+                  <div className="text-[11px] text-slate-350 leading-relaxed bg-slate-900/40 p-2 rounded border border-slate-800/30">
+                    <span className="text-emerald-500 font-bold block text-[9px] mb-0.5">WhatsApp Template Preview</span>
+                    "Hi {invoice?.client?.name}, your payment of {invoice ? formatCurrency(Number(invoice.total)) : ""} to {invoice?.business?.name} is overdue. Please pay immediately."
+                  </div>
+                  <div className="text-[11px] text-slate-350 leading-relaxed bg-slate-900/40 p-2 rounded border border-slate-800/30">
+                    <span className="text-sky-500 font-bold block text-[9px] mb-0.5">Email Subject Preview</span>
+                    "URGENT: Invoice {invoice?.invoice_number} requires immediate payment"
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="text-[11px] text-slate-350 leading-relaxed bg-slate-900/40 p-2 rounded border border-slate-800/30">
+                    <span className="text-emerald-500 font-bold block text-[9px] mb-0.5">WhatsApp Template Preview</span>
+                    "Hi {invoice?.client?.name}, friendly reminder that your payment of {invoice ? formatCurrency(Number(invoice.total)) : ""} to {invoice?.business?.name} is due on {invoice ? formatDate(invoice.due_date) : ""}."
+                  </div>
+                  <div className="text-[11px] text-slate-350 leading-relaxed bg-slate-900/40 p-2 rounded border border-slate-800/30">
+                    <span className="text-sky-500 font-bold block text-[9px] mb-0.5">Email Subject Preview</span>
+                    "Friendly reminder: Invoice {invoice?.invoice_number} due {invoice ? formatDate(invoice.due_date) : ""}"
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-800/60">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-slate-800 text-slate-300 hover:bg-slate-800 hover:text-white text-xs"
+                onClick={() => setIsRemindOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                disabled={isProcessing}
+              >
+                {isProcessing ? "Sending..." : "Send Reminder"}
               </Button>
             </div>
           </form>

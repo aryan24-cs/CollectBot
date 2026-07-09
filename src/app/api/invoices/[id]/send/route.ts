@@ -4,6 +4,8 @@ import { createPaymentLink } from "@/lib/razorpay/createPaymentLink"
 import { renderToBuffer } from "@react-pdf/renderer"
 import React from "react"
 import InvoiceDocument from "@/lib/pdf/InvoiceDocument"
+import { sendInvoiceNotification } from "@/lib/whatsapp/templates"
+import { sendInvoiceEmail } from "@/lib/email/send"
 
 export async function POST(
   request: NextRequest,
@@ -128,14 +130,117 @@ export async function POST(
             .from("invoices")
             .update({ pdf_url: publicUrl })
             .eq("id", id)
+
+          invoice.pdf_url = publicUrl
         }
       } catch (pdfErr) {
         console.error("PDF generation failed during Send:", pdfErr)
       }
     }
 
-    // Trigger Notifications (Phase 4 - skip for now, log placeholder)
-    console.log(`[Phase 4 Notification Trigger] Triggering Whatsapp & Email dispatch for invoice ${invoice.invoice_number}`)
+    // Fetch notification settings
+    const { data: settings } = await supabase
+      .from("notification_settings")
+      .select("*")
+      .eq("business_id", invoice.business.id)
+      .maybeSingle()
+
+    const channelWhatsapp = false // Forced false to disable WhatsApp
+    const channelEmail = true // Forced true to ensure email delivery
+    const sentVia: string[] = []
+
+    const formattedAmount = `₹${Number(invoice.total).toLocaleString("en-IN")}`
+
+    // 1. Send WhatsApp if enabled
+    if (channelWhatsapp && invoice.client.phone) {
+      try {
+        const waResult = await sendInvoiceNotification({
+          phone: invoice.client.phone,
+          clientName: invoice.client.name,
+          invoiceNumber: invoice.invoice_number,
+          businessName: invoice.business.name,
+          amount: formattedAmount,
+          dueDate: invoice.due_date,
+          paymentLink: url,
+        })
+
+        if (waResult.success) {
+          sentVia.push("whatsapp")
+          await supabase.from("reminder_logs").insert({
+            invoice_id: invoice.id,
+            business_id: invoice.business.id,
+            reminder_type: "invoice_sent",
+            channel: "whatsapp",
+            status: "sent",
+            message_content: `WhatsApp notification successfully sent to +91${invoice.client.phone.slice(-10)}`,
+          })
+        } else {
+          await supabase.from("reminder_logs").insert({
+            invoice_id: invoice.id,
+            business_id: invoice.business.id,
+            reminder_type: "invoice_sent",
+            channel: "whatsapp",
+            status: "failed",
+            error_message: waResult.error || "Failed to dispatch WhatsApp message via Interakt",
+          })
+        }
+      } catch (waErr: any) {
+        console.error("WhatsApp notification trigger crashed:", waErr)
+        await supabase.from("reminder_logs").insert({
+          invoice_id: invoice.id,
+          business_id: invoice.business.id,
+          reminder_type: "invoice_sent",
+          channel: "whatsapp",
+          status: "failed",
+          error_message: waErr.message || "WhatsApp send call crashed internally",
+        })
+      }
+    }
+
+    // 2. Send Email if enabled
+    if (channelEmail && invoice.client.email) {
+      try {
+        const emailItems = (invoice.items || []).map((item: any) => ({
+          description: item.description,
+          amount: `₹${Number(item.amount).toLocaleString("en-IN")}`,
+        }))
+
+        await sendInvoiceEmail({
+          to: invoice.client.email,
+          businessName: invoice.business.name,
+          businessLogo: invoice.business.logo_url,
+          clientName: invoice.client.name,
+          invoiceNumber: invoice.invoice_number,
+          amount: formattedAmount,
+          dueDate: invoice.due_date,
+          paymentLink: url,
+          items: emailItems,
+          businessPhone: invoice.business.phone || "",
+          businessEmail: invoice.business.email || "",
+          pdfUrl: invoice.pdf_url,
+        })
+
+        sentVia.push("email")
+        await supabase.from("reminder_logs").insert({
+          invoice_id: invoice.id,
+          business_id: invoice.business.id,
+          reminder_type: "invoice_sent",
+          channel: "email",
+          status: "sent",
+          message_content: `Email notification successfully sent to ${invoice.client.email}`,
+        })
+      } catch (mailErr: any) {
+        console.error("Email notification trigger crashed:", mailErr)
+        await supabase.from("reminder_logs").insert({
+          invoice_id: invoice.id,
+          business_id: invoice.business.id,
+          reminder_type: "invoice_sent",
+          channel: "email",
+          status: "failed",
+          error_message: mailErr.message || "Resend email dispatch crashed internally",
+        })
+      }
+    }
 
     // Log in activity_logs
     await supabase.from("activity_logs").insert({
@@ -145,11 +250,11 @@ export async function POST(
       metadata: { 
         invoice_id: invoice.id,
         payment_link: url,
-        notifications_pending: true 
+        sent_via: sentVia
       },
     })
 
-    return NextResponse.json({ success: true, paymentLink: url })
+    return NextResponse.json({ success: true, paymentLink: url, sentVia })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
