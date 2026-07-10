@@ -262,43 +262,43 @@ export default function DashboardPage() {
         {/* Header skeleton */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-2">
-            <div className="h-8 w-48 bg-slate-900 rounded-lg"></div>
-            <div className="h-4 w-64 bg-slate-900/60 rounded-lg"></div>
+            <div className="h-8 w-48 bg-slate-200 rounded-lg"></div>
+            <div className="h-4 w-64 bg-slate-200/60 rounded-lg"></div>
           </div>
           <div className="flex gap-2">
-            <div className="h-9 w-24 bg-slate-900 rounded-lg"></div>
-            <div className="h-9 w-24 bg-slate-900 rounded-lg"></div>
+            <div className="h-9 w-24 bg-slate-200 rounded-lg"></div>
+            <div className="h-9 w-24 bg-slate-200 rounded-lg"></div>
           </div>
         </div>
 
         {/* Stats Grid skeleton */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="border border-slate-900 bg-slate-900/60 p-4 rounded-xl shadow-xl h-24 space-y-3">
+            <div key={i} className="border border-slate-200 bg-white p-4 rounded-xl shadow-sm h-24 space-y-3">
               <div className="flex justify-between items-center">
-                <div className="h-4 w-20 bg-slate-950 rounded"></div>
-                <div className="h-7 w-7 bg-slate-950 rounded-lg"></div>
+                <div className="h-4 w-20 bg-slate-100 rounded"></div>
+                <div className="h-7 w-7 bg-slate-100 rounded-lg"></div>
               </div>
-              <div className="h-6 w-28 bg-slate-950 rounded"></div>
+              <div className="h-6 w-28 bg-slate-100 rounded"></div>
             </div>
           ))}
         </div>
 
         {/* Chart & Activity Grid skeleton */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-8 border border-slate-900 bg-slate-900/60 rounded-xl p-5 shadow-xl h-80 space-y-4">
-            <div className="h-5 w-40 bg-slate-950 rounded"></div>
-            <div className="h-56 bg-slate-950 rounded-lg"></div>
+          <div className="lg:col-span-8 border border-slate-200 bg-white rounded-xl p-5 shadow-sm h-80 space-y-4">
+            <div className="h-5 w-40 bg-slate-100 rounded"></div>
+            <div className="h-56 bg-slate-55 rounded-lg"></div>
           </div>
-          <div className="lg:col-span-4 border border-slate-900 bg-slate-900/60 rounded-xl p-5 shadow-xl h-80 space-y-4">
-            <div className="h-5 w-40 bg-slate-950 rounded"></div>
+          <div className="lg:col-span-4 border border-slate-200 bg-white rounded-xl p-5 shadow-sm h-80 space-y-4">
+            <div className="h-5 w-40 bg-slate-100 rounded"></div>
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => (
                 <div key={i} className="flex gap-3 items-center">
-                  <div className="w-8 h-8 rounded-lg bg-slate-950 shrink-0"></div>
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 shrink-0"></div>
                   <div className="space-y-1.5 flex-1">
-                    <div className="h-3 w-32 bg-slate-950 rounded"></div>
-                    <div className="h-2 w-20 bg-slate-950 rounded"></div>
+                    <div className="h-3 w-32 bg-slate-100 rounded"></div>
+                    <div className="h-2 w-20 bg-slate-100 rounded"></div>
                   </div>
                 </div>
               ))}
@@ -314,9 +314,9 @@ export default function DashboardPage() {
       {/* Welcome header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Dashboard</h1>
-          <p className="text-slate-400 text-sm">
-            Welcome back to <span className="text-indigo-400 font-semibold">{businessName}</span>. Workspace overview.
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Dashboard</h1>
+          <p className="text-slate-500 text-sm">
+            Welcome back to <span className="text-indigo-650 font-bold">{businessName}</span>. Workspace overview.
           </p>
         </div>
         <div className="flex gap-2">
@@ -324,7 +324,7 @@ export default function DashboardPage() {
             href="/invoices/new"
             className={cn(
               buttonVariants({ variant: "default" }),
-              "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white gap-2 shadow-lg shadow-indigo-500/10 text-xs"
+              "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl gap-2 shadow-sm text-xs font-semibold"
             )}
           >
             <Plus className="w-4 h-4" />
@@ -335,51 +335,51 @@ export default function DashboardPage() {
 
       {/* Stats Summary Cards Row */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-slate-900 border-slate-800 text-white">
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-slate-400">Total Billed</CardTitle>
-            <FileText className="w-4 h-4 text-indigo-400" />
+            <CardTitle className="text-xs font-semibold text-slate-500">Total Billed</CardTitle>
+            <FileText className="w-4 h-4 text-indigo-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(stats.totalInvoiced)}</div>
-            <p className="text-[10px] text-slate-500 mt-1">Lifetime invoicing volume</p>
+            <div className="text-2xl font-bold font-mono text-slate-900">{formatCurrency(stats.totalInvoiced)}</div>
+            <p className="text-[10px] text-slate-450 mt-1">Lifetime invoicing volume</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-slate-400">Total Collected</CardTitle>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
+            <CardTitle className="text-xs font-semibold text-slate-500">Total Collected</CardTitle>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono text-emerald-400">{formatCurrency(stats.totalCollected)}</div>
-            <p className="text-[10px] text-slate-500 mt-1">Cleared revenue</p>
+            <div className="text-2xl font-bold font-mono text-emerald-700">{formatCurrency(stats.totalCollected)}</div>
+            <p className="text-[10px] text-slate-450 mt-1">Cleared revenue</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-slate-400">Outstanding Balance</CardTitle>
-            <IndianRupee className="w-4 h-4 text-amber-400" />
+            <CardTitle className="text-xs font-semibold text-slate-500">Outstanding Balance</CardTitle>
+            <IndianRupee className="w-4 h-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className={cn("text-2xl font-bold font-mono", stats.outstanding > 0 ? "text-amber-400" : "text-slate-400")}>
+            <div className={cn("text-2xl font-bold font-mono", stats.outstanding > 0 ? "text-amber-700" : "text-slate-500")}>
               {formatCurrency(stats.outstanding)}
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Awaiting client payment</p>
+            <p className="text-[10px] text-slate-450 mt-1">Awaiting client payment</p>
           </CardContent>
         </Card>
 
-        <Card className="bg-slate-900 border-slate-800 text-white">
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-slate-400">Overdue Invoices</CardTitle>
-            <AlertTriangle className="w-4 h-4 text-rose-450" />
+            <CardTitle className="text-xs font-semibold text-slate-500">Overdue Invoices</CardTitle>
+            <AlertTriangle className="w-4 h-4 text-rose-500" />
           </CardHeader>
           <CardContent>
-            <div className={cn("text-2xl font-bold font-mono", stats.overdueCount > 0 ? "text-rose-400 animate-pulse" : "text-slate-400")}>
+            <div className={cn("text-2xl font-bold font-mono", stats.overdueCount > 0 ? "text-rose-600" : "text-slate-500")}>
               {stats.overdueCount}
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Alert cycles active</p>
+            <p className="text-[10px] text-slate-450 mt-1">Alert cycles active</p>
           </CardContent>
         </Card>
       </div>
@@ -387,30 +387,30 @@ export default function DashboardPage() {
       {/* Monthly chart visualizer & activity timelines */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         {/* Recharts chart block */}
-        <Card className="col-span-4 bg-slate-900 border-slate-800 text-white shadow-xl">
+        <Card className="col-span-4 bg-white border-slate-200 text-slate-850 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader>
-            <CardTitle className="text-base font-bold">Monthly Collection Overview</CardTitle>
-            <CardDescription className="text-slate-400 text-xs">Comparison between billed amounts and received payments (Last 6 Months).</CardDescription>
+            <CardTitle className="text-base font-bold text-slate-900">Monthly Collection Overview</CardTitle>
+            <CardDescription className="text-slate-500 text-xs">Comparison between billed amounts and received payments (Last 6 Months).</CardDescription>
           </CardHeader>
           <CardContent className="h-72 mt-2">
             {mounted && chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="monthName" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
                   <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(v) => `₹${v >= 1000 ? (v / 1000) + "k" : v}`} />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: "#0f172a", border: "1px solid #1e293b", borderRadius: "8px" }} 
-                    labelStyle={{ color: "#ffffff", fontWeight: "bold", fontSize: "11px" }}
+                    contentStyle={{ backgroundColor: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", boxShadow: "0 4px 12px rgba(0,0,0,0.02)" }} 
+                    labelStyle={{ color: "#0f172a", fontWeight: "bold", fontSize: "11px" }}
                     itemStyle={{ fontSize: "11px" }}
                   />
-                  <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: "11px", color: "#94a3b8" }} />
+                  <Legend verticalAlign="top" height={36} iconSize={10} wrapperStyle={{ fontSize: "11px", color: "#64748b" }} />
                   <Bar dataKey="billed" name="Billed Amount" fill="#6366f1" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="collected" name="Collected" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-full text-slate-500 text-xs italic">
+              <div className="flex items-center justify-center h-full text-slate-450 text-xs italic">
                 Awaiting transaction events to populate overview graph.
               </div>
             )}
@@ -418,29 +418,29 @@ export default function DashboardPage() {
         </Card>
 
         {/* Recent logs timelines */}
-        <Card className="col-span-3 bg-slate-900 border-slate-800 text-white shadow-xl">
+        <Card className="col-span-3 bg-white border-slate-200 text-slate-850 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-base font-bold">Recent Activities</CardTitle>
-              <CardDescription className="text-slate-400 text-xs">Audit logs of actions, payments, and clients.</CardDescription>
+              <CardTitle className="text-base font-bold text-slate-900">Recent Activities</CardTitle>
+              <CardDescription className="text-slate-500 text-xs">Audit logs of actions, payments, and clients.</CardDescription>
             </div>
-            <Activity className="w-4 h-4 text-indigo-400" />
+            <Activity className="w-4 h-4 text-indigo-650" />
           </CardHeader>
           <CardContent className="p-0">
             {recentLogs.length === 0 ? (
-              <div className="flex items-center justify-center py-16 text-slate-500 text-xs italic">
+              <div className="flex items-center justify-center py-16 text-slate-450 text-xs italic">
                 No recent activity logs recorded yet.
               </div>
             ) : (
-              <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-[300px]">
+              <div className="divide-y divide-slate-100 overflow-y-auto max-h-[300px]">
                 {recentLogs.map((log) => (
-                  <div key={log.id} className="p-3.5 hover:bg-slate-800/10 transition-colors flex gap-3.5 items-start">
-                    <div className="p-2 rounded-lg bg-slate-950 border border-slate-800 flex-shrink-0 mt-0.5">
+                  <div key={log.id} className="p-3.5 hover:bg-slate-50 transition-colors flex gap-3.5 items-start">
+                    <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 flex-shrink-0 mt-0.5">
                       {getLogIcon(log.type)}
                     </div>
                     <div className="space-y-0.5 min-w-0 flex-grow">
-                      <p className="text-xs text-slate-200 leading-snug">{log.description}</p>
-                      <span className="text-[10px] text-slate-500 block font-mono">{new Date(log.created_at).toLocaleString("en-IN", { hour: "numeric", minute: "numeric", hour12: true, month: "short", day: "numeric" })}</span>
+                      <p className="text-xs text-slate-700 leading-snug font-semibold">{log.description}</p>
+                      <span className="text-[10px] text-slate-450 block font-mono">{new Date(log.created_at).toLocaleString("en-IN", { hour: "numeric", minute: "numeric", hour12: true, month: "short", day: "numeric" })}</span>
                     </div>
                   </div>
                 ))}

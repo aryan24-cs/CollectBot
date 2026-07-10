@@ -19,7 +19,7 @@ export default function MobileNav() {
   ]
 
   return (
-    <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex items-center justify-around px-2 z-20 shadow-lg">
+    <nav className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 flex items-center justify-around px-2 z-20 shadow-sm">
       {navItems.map((item) => {
         const isActive = pathname.startsWith(item.href)
         const Icon = item.icon
@@ -28,11 +28,11 @@ export default function MobileNav() {
             key={item.name}
             href={item.href}
             className={cn(
-              "flex flex-col items-center justify-center flex-grow h-full py-1 text-xs gap-1.5 font-medium transition-all duration-200",
-              isActive ? "text-indigo-400 font-semibold" : "text-slate-400 hover:text-slate-200"
+              "flex flex-col items-center justify-center flex-grow h-full py-1 text-xs gap-1.5 font-semibold transition-all duration-200",
+              isActive ? "text-indigo-650 font-bold" : "text-slate-550 hover:text-slate-900"
             )}
           >
-            <Icon className={cn("w-5 h-5", isActive ? "scale-110" : "scale-100")} />
+            <Icon className={cn("w-5 h-5", isActive ? "scale-110 text-indigo-650" : "scale-100 text-slate-400")} />
             <span className="text-[10px] tracking-wide">{item.name}</span>
           </Link>
         )

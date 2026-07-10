@@ -290,14 +290,14 @@ export default function InvoicesPage() {
       {/* Header section with Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Invoices</h1>
-          <p className="text-slate-400 text-sm">Issue itemized bills, capture client receipts, and run auto-reconciliation.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Invoices</h1>
+          <p className="text-slate-500 text-sm">Issue itemized bills, capture client receipts, and run auto-reconciliation.</p>
         </div>
         <Link
           href="/invoices/new"
           className={cn(
             buttonVariants({ variant: "default" }),
-            "bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white gap-2 shadow-lg shadow-indigo-500/10"
+            "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl gap-2 shadow-sm font-semibold"
           )}
         >
           <Plus className="w-4 h-4" />
@@ -307,37 +307,37 @@ export default function InvoicesPage() {
 
       {/* Invoice Stats Summary Cards */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-slate-900 border-slate-800 text-white p-4">
-          <div className="text-xs text-slate-400 font-semibold mb-1">Invoiced This Month</div>
-          <div className="text-xl font-bold font-mono text-white">{formatCurrency(stats.totalThisMonth)}</div>
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
+          <div className="text-xs text-slate-500 font-semibold mb-1">Invoiced This Month</div>
+          <div className="text-xl font-bold font-mono text-slate-900">{formatCurrency(stats.totalThisMonth)}</div>
         </Card>
-        <Card className="bg-slate-900 border-slate-800 text-white p-4">
-          <div className="text-xs text-slate-400 font-semibold mb-1">Collected This Month</div>
-          <div className="text-xl font-bold font-mono text-emerald-400">{formatCurrency(stats.collectedThisMonth)}</div>
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
+          <div className="text-xs text-slate-500 font-semibold mb-1">Collected This Month</div>
+          <div className="text-xl font-bold font-mono text-emerald-700">{formatCurrency(stats.collectedThisMonth)}</div>
         </Card>
-        <Card className="bg-slate-900 border-slate-800 text-white p-4">
-          <div className="text-xs text-slate-400 font-semibold mb-1">Outstanding Balance</div>
-          <div className="text-xl font-bold font-mono text-amber-400">{formatCurrency(stats.outstanding)}</div>
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
+          <div className="text-xs text-slate-500 font-semibold mb-1">Outstanding Balance</div>
+          <div className="text-xl font-bold font-mono text-amber-700">{formatCurrency(stats.outstanding)}</div>
         </Card>
-        <Card className="bg-slate-900 border-slate-800 text-white p-4">
-          <div className="text-xs text-slate-400 font-semibold mb-1">Overdue Amount</div>
-          <div className="text-xl font-bold font-mono text-rose-400">{formatCurrency(stats.overdue)}</div>
+        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
+          <div className="text-xs text-slate-500 font-semibold mb-1">Overdue Amount</div>
+          <div className="text-xl font-bold font-mono text-rose-600">{formatCurrency(stats.overdue)}</div>
         </Card>
       </div>
 
       {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900/60 backdrop-blur-md p-4 rounded-xl border border-slate-800/85">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
         {/* Tabs */}
-        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800 w-full sm:w-auto">
+        <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200/60 w-full sm:w-auto">
           {["all", "draft", "sent", "paid", "overdue"].map((tab) => (
             <button
               key={tab}
               onClick={() => { setStatusTab(tab); setCurrentPage(1); setSelectedIds([]) }}
               className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer flex-1 sm:flex-none text-center",
+                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex-1 sm:flex-none text-center",
                 statusTab === tab
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-400 hover:text-slate-200"
+                  ? "bg-white text-indigo-700 border border-slate-200 shadow-sm"
+                  : "text-slate-500 hover:text-slate-800"
               )}
             >
               {tab}
@@ -347,10 +347,10 @@ export default function InvoicesPage() {
 
         {/* Search */}
         <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Search invoice # or client name..."
-            className="pl-10 bg-slate-950/80 border-slate-800 text-white focus-visible:ring-indigo-500 placeholder:text-slate-650 text-xs"
+            className="pl-10 bg-white border border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 placeholder:text-slate-400 text-xs rounded-xl"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -359,15 +359,15 @@ export default function InvoicesPage() {
 
       {/* Bulk actions status panel */}
       {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 bg-indigo-500/10 border border-indigo-500/30 p-3 rounded-lg text-xs justify-between animate-fadeIn text-indigo-300">
+        <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs justify-between animate-fadeIn text-indigo-700">
           <div>
-            Selected <span className="font-bold text-white">{selectedIds.length}</span> invoices
+            Selected <span className="font-bold text-indigo-900">{selectedIds.length}</span> invoices
           </div>
           <div className="flex gap-2">
             <Button
               variant="outline"
               size="xs"
-              className="bg-slate-950/40 border-slate-805 hover:bg-slate-800 text-slate-300 text-[10px]"
+              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] rounded-xl shadow-sm"
               onClick={() => { setBulkActionType("send"); handleBulkAction() }}
             >
               <Send className="w-3 h-3 mr-1" />
@@ -376,7 +376,7 @@ export default function InvoicesPage() {
             <Button
               variant="outline"
               size="xs"
-              className="border-red-950/40 bg-red-950/10 text-red-400 hover:text-white hover:bg-red-700 text-[10px]"
+              className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 text-[10px] rounded-xl shadow-sm"
               onClick={() => setBulkActionType("delete")}
             >
               <Trash2 className="w-3 h-3 mr-1" />
@@ -387,35 +387,35 @@ export default function InvoicesPage() {
       )}
 
       {/* Invoices List Table Card */}
-      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 overflow-hidden shadow-2xl">
+      <Card className="border-slate-200 bg-white text-slate-800 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
         <CardContent className="p-0">
           {isLoading ? (
             /* Loading Skeleton */
             <div className="p-8 space-y-4">
               {[...Array(5)].map((_, i) => (
                 <div key={i} className="flex items-center gap-4 animate-pulse">
-                  <div className="w-5 h-5 bg-slate-800 rounded" />
+                  <div className="w-5 h-5 bg-slate-200 rounded" />
                   <div className="flex-grow space-y-2">
-                    <div className="h-4 bg-slate-800 rounded w-1/5" />
-                    <div className="h-3 bg-slate-800 rounded w-1/4" />
+                    <div className="h-4 bg-slate-200 rounded w-1/5" />
+                    <div className="h-3 bg-slate-200 rounded w-1/4" />
                   </div>
-                  <div className="w-16 h-4 bg-slate-800 rounded" />
+                  <div className="w-16 h-4 bg-slate-200 rounded" />
                 </div>
               ))}
             </div>
           ) : invoices.length === 0 ? (
             /* Empty State */
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-              <div className="w-14 h-14 rounded-full bg-slate-800/60 border border-slate-800 flex items-center justify-center text-slate-655 mb-4">
+              <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-4">
                 <FileText className="w-7 h-7" />
               </div>
-              <h3 className="text-base font-bold text-white mb-1">{getEmptyStateText()}</h3>
+              <h3 className="text-base font-bold text-slate-900 mb-1">{getEmptyStateText()}</h3>
               {statusTab === "all" && (
                 <Link
                   href="/invoices/new"
                   className={cn(
                     buttonVariants({ variant: "outline" }),
-                    "mt-4 border-indigo-500/20 text-indigo-400 hover:bg-indigo-500/10 font-semibold gap-2"
+                    "mt-4 border-indigo-200 text-indigo-650 hover:bg-indigo-50 font-bold gap-2 rounded-xl"
                   )}
                 >
                   <Plus className="w-4 h-4" />
@@ -428,11 +428,11 @@ export default function InvoicesPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-slate-800/80 bg-slate-900/40 text-xs font-semibold text-slate-400 tracking-wider">
+                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-bold text-slate-500 tracking-wider">
                     <th className="px-5 py-4 w-12 text-center">
                       <input
                         type="checkbox"
-                        className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-slate-950 h-3.5 w-3.5"
+                        className="rounded border-slate-200 text-indigo-605 focus:ring-indigo-600 bg-white h-3.5 w-3.5"
                         checked={selectedIds.length === invoices.length}
                         onChange={handleSelectAll}
                       />
@@ -446,47 +446,47 @@ export default function InvoicesPage() {
                     <th className="px-5 py-4 text-center">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60 text-sm text-slate-300">
+                <tbody className="divide-y divide-slate-100 text-xs text-slate-650">
                   {invoices.map((inv) => {
                     const daysOver = getDaysOverdue(inv.due_date)
                     const isOver = (inv.status === "overdue" || (["sent", "viewed"].includes(inv.status) && daysOver > 0))
                     
                     return (
-                      <tr key={inv.id} className="hover:bg-slate-800/20 transition-colors">
+                      <tr key={inv.id} className="hover:bg-slate-50/60 transition-colors">
                         <td className="px-5 py-3.5 text-center">
                           <input
                             type="checkbox"
-                            className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-500 bg-slate-950 h-3.5 w-3.5"
+                            className="rounded border-slate-200 text-indigo-605 focus:ring-indigo-600 bg-white h-3.5 w-3.5"
                             checked={selectedIds.includes(inv.id)}
                             onChange={() => handleSelectRow(inv.id)}
                           />
                         </td>
-                        <td className="px-5 py-3.5 font-mono font-semibold text-indigo-400">
+                        <td className="px-5 py-3.5 font-mono font-bold text-indigo-600">
                           <Link href={`/invoices/${inv.id}`} className="hover:underline">
                             {inv.invoice_number}
                           </Link>
                         </td>
-                        <td className="px-5 py-3.5 font-medium text-white hover:underline">
+                        <td className="px-5 py-3.5 font-bold text-slate-900 hover:text-indigo-650 hover:underline">
                           {inv.client ? (
                             <Link href={`/clients/${inv.client_id}`}>
                               {inv.client.name}
                             </Link>
                           ) : (
-                            <span className="text-slate-500 italic">Deleted Client</span>
+                            <span className="text-slate-400 italic font-medium">Deleted Client</span>
                           )}
                         </td>
-                        <td className="px-5 py-3.5 text-xs text-slate-400">{formatDateShort(inv.issue_date)}</td>
-                        <td className="px-5 py-3.5 text-xs">
+                        <td className="px-5 py-3.5 text-slate-500">{formatDateShort(inv.issue_date)}</td>
+                        <td className="px-5 py-3.5">
                           <div className="flex flex-col">
                             <span>{formatDateShort(inv.due_date)}</span>
                             {isOver && (
-                              <span className="text-[10px] text-rose-400 font-semibold mt-0.5">
+                              <span className="text-[10px] text-rose-600 font-bold mt-0.5 animate-pulse">
                                 {daysOver} {daysOver === 1 ? "day" : "days"} overdue
                               </span>
                             )}
                           </div>
                         </td>
-                        <td className="px-5 py-3.5 text-right font-mono font-bold text-white">
+                        <td className="px-5 py-3.5 text-right font-mono font-bold text-slate-900">
                           {formatCurrency(Number(inv.total) || 0)}
                         </td>
                         <td className="px-5 py-3.5 text-center">
@@ -500,17 +500,17 @@ export default function InvoicesPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-slate-400 hover:text-white"
+                              className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl"
                               onClick={() => router.push(`/invoices/${inv.id}`)}
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
 
                             <DropdownMenu>
-                              <DropdownMenuTrigger className="h-8 w-8 text-slate-405 hover:text-white hover:bg-slate-800 transition-colors flex items-center justify-center rounded-md cursor-pointer">
+                              <DropdownMenuTrigger className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors flex items-center justify-center rounded-xl cursor-pointer border border-transparent hover:border-slate-200">
                                 <MoreVertical className="w-4 h-4" />
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-slate-900 border-slate-800 text-slate-100 w-36">
+                              <DropdownMenuContent className="bg-white border border-slate-200 text-slate-800 w-36 rounded-xl shadow-lg">
                                 <DropdownMenuItem onClick={() => router.push(`/invoices/${inv.id}`)}>
                                   <Eye className="w-3.5 h-3.5 mr-2" />
                                   View Details
@@ -522,13 +522,13 @@ export default function InvoicesPage() {
                                   </DropdownMenuItem>
                                 )}
                                 {["sent", "viewed", "overdue", "partial"].includes(inv.status) && (
-                                  <DropdownMenuItem onClick={() => handleMarkPaid(inv.id)} className="text-emerald-400 focus:text-emerald-300">
+                                  <DropdownMenuItem onClick={() => handleMarkPaid(inv.id)} className="text-emerald-600 focus:text-emerald-700">
                                     <CheckCircle className="w-3.5 h-3.5 mr-2" />
                                     Mark Paid
                                   </DropdownMenuItem>
                                 )}
                                 {(inv.status === "draft" || inv.status === "cancelled") && (
-                                  <DropdownMenuItem onClick={() => setInvoiceToDelete(inv)} className="text-red-400 focus:text-red-300 focus:bg-red-950/20">
+                                  <DropdownMenuItem onClick={() => setInvoiceToDelete(inv)} className="text-rose-600 focus:text-rose-700 focus:bg-rose-50">
                                     <Trash2 className="w-3.5 h-3.5 mr-2" />
                                     Delete
                                   </DropdownMenuItem>
@@ -548,16 +548,16 @@ export default function InvoicesPage() {
 
         {/* Pagination bar */}
         {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800/80 bg-slate-900/30 text-xs text-slate-400">
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
             <div>
-              Showing page <span className="font-semibold text-white">{currentPage}</span> of{" "}
-              <span className="font-semibold text-white">{totalPages}</span> ({totalCount} total invoices)
+              Showing page <span className="font-semibold text-slate-900">{currentPage}</span> of{" "}
+              <span className="font-semibold text-slate-900">{totalPages}</span> ({totalCount} total invoices)
             </div>
             <div className="flex items-center gap-1.5">
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-slate-950/40 border-slate-800 text-slate-300 hover:bg-slate-800"
+                className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
                 onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                 disabled={currentPage === 1}
               >
@@ -566,7 +566,7 @@ export default function InvoicesPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="bg-slate-950/40 border-slate-800 text-slate-300 hover:bg-slate-800"
+                className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
                 onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                 disabled={currentPage === totalPages}
               >
@@ -579,10 +579,10 @@ export default function InvoicesPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!invoiceToDelete} onOpenChange={(open) => !open && setInvoiceToDelete(null)}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-sm">
+        <DialogContent className="bg-white border-slate-200 text-slate-800 max-w-sm rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-white">Delete Invoice?</DialogTitle>
-            <DialogDescription className="text-slate-400 text-sm">
+            <DialogTitle className="text-lg font-bold text-slate-900">Delete Invoice?</DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm">
               Are you sure you want to delete invoice <strong>{invoiceToDelete?.invoice_number}</strong>?
               This action will remove all associated line items.
             </DialogDescription>
@@ -590,14 +590,14 @@ export default function InvoicesPage() {
           <DialogFooter className="flex justify-end gap-2.5 pt-4">
             <Button
               variant="outline"
-              className="bg-slate-950/40 border-slate-800 text-slate-300 hover:bg-slate-800"
+              className="bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 rounded-xl"
               onClick={() => setInvoiceToDelete(null)}
               disabled={isDeleting}
             >
               Cancel
             </Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white font-medium"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl"
               onClick={handleDeleteInvoice}
               disabled={isDeleting}
             >
@@ -610,24 +610,24 @@ export default function InvoicesPage() {
 
       {/* Bulk Delete Dialog */}
       <Dialog open={bulkActionType === "delete"} onOpenChange={(open) => !open && setBulkActionType(null)}>
-        <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-sm">
+        <DialogContent className="bg-white border-slate-200 text-slate-800 max-w-sm rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-white">Bulk Delete Invoices?</DialogTitle>
-            <DialogDescription className="text-slate-400 text-sm">
-              Are you sure you want to delete <span className="font-bold text-white">{selectedIds.length}</span> selected invoices?
+            <DialogTitle className="text-lg font-bold text-slate-900">Bulk Delete Invoices?</DialogTitle>
+            <DialogDescription className="text-slate-500 text-sm">
+              Are you sure you want to delete <span className="font-bold text-slate-900">{selectedIds.length}</span> selected invoices?
               Only drafts and cancelled invoices can be deleted. This action is permanent.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex justify-end gap-2.5 pt-4">
             <Button
               variant="outline"
-              className="bg-slate-950/40 border-slate-805 text-slate-300 hover:bg-slate-800"
+              className="bg-white border-slate-200 text-slate-650 hover:bg-slate-50 rounded-xl"
               onClick={() => setBulkActionType(null)}
             >
               Cancel
             </Button>
             <Button
-              className="bg-red-600 hover:bg-red-700 text-white font-medium"
+              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl"
               onClick={handleBulkAction}
               disabled={isBulkProcessing}
             >

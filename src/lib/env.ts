@@ -25,8 +25,13 @@ export function validateEnv() {
   if (missing.length > 0) {
     const errorMsg = `⚠️ CRITICAL LAUNCH FAILURE: The following required environment variables are missing:\n${missing.join("\n")}\n\nPlease check your .env.local configurations.`
     console.error(errorMsg)
-    if (process.env.NODE_ENV === "production") {
+    
+    // Do not throw build-halting errors during production build compilation
+    const isBuildPhase = process.env.PHASE === "phase-production-build" || process.env.NEXT_PHASE === "phase-production-build"
+    if (process.env.NODE_ENV === "production" && !isBuildPhase) {
       throw new Error(errorMsg)
+    } else if (isBuildPhase) {
+      console.warn("⚠️ Warning: Continuing build despite missing required env variables (build phase dynamic bypass).")
     }
   } else {
     console.log("✅ Launch Readiness: Environment variables validated successfully.")

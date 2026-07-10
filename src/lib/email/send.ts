@@ -3,7 +3,11 @@ import { InvoiceEmail } from "./templates/InvoiceEmail"
 import { ReminderEmail } from "./templates/ReminderEmail"
 import { ReceiptEmail } from "./templates/ReceiptEmail"
 import { ThankYouEmail } from "./templates/ThankYouEmail"
-import { renderToStaticMarkup } from "react-dom/server"
+
+async function renderHtml(element: React.ReactElement): Promise<string> {
+  const { renderToStaticMarkup } = await import("react-dom/server")
+  return renderToStaticMarkup(element)
+}
 
 // Fallback sender address for testing (SMTP verified sender)
 const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "CollectBot <billing@yourdomain.com>"
@@ -57,7 +61,7 @@ export async function sendInvoiceEmail({
     }
   }
 
-  const html = renderToStaticMarkup(InvoiceEmail({ businessName, ...props }))
+  const html = await renderHtml(InvoiceEmail({ businessName, ...props }))
 
   await transporter.sendMail({
     from: FROM_EMAIL,
@@ -95,7 +99,7 @@ export async function sendReminderEmail({
     subject = `URGENT: Invoice ${props.invoiceNumber} is ${daysLabel}overdue`
   }
 
-  const html = renderToStaticMarkup(ReminderEmail({ reminderType, ...props }))
+  const html = await renderHtml(ReminderEmail({ reminderType, ...props }))
 
   await transporter.sendMail({
     from: FROM_EMAIL,
@@ -137,7 +141,7 @@ export async function sendReceiptEmail({
     }
   }
 
-  const html = renderToStaticMarkup(ReceiptEmail({ receiptUrl, ...props }))
+  const html = await renderHtml(ReceiptEmail({ receiptUrl, ...props }))
 
   await transporter.sendMail({
     from: FROM_EMAIL,

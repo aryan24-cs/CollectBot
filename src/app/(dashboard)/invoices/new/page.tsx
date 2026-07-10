@@ -279,32 +279,29 @@ export default function NewInvoicePage() {
 
   if (isLoadingData) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-white">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500 mb-4" />
-        <p className="text-slate-400">Loading resources...</p>
+      <div className="min-h-[50vh] flex flex-col items-center justify-center text-slate-500 animate-pulse">
+        <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mb-4" />
+        <p className="text-slate-500">Loading resources...</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-6 select-none max-w-7xl mx-auto">
-      {/* Page header */}
-      <div className="flex items-center justify-between">
+      {/* Top Header */}
+      <div className="flex flex-col gap-4 border-b border-slate-200 pb-5">
         <div>
           <Link
             href="/invoices"
-            className={cn(
-              buttonVariants({ variant: "ghost" }),
-              "text-slate-400 hover:text-white hover:bg-slate-800 -ml-3 mb-2 gap-2 text-xs"
-            )}
+            className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-800 mb-2 font-medium"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Invoices
           </Link>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
             {editId ? "Edit Invoice Draft" : "Create Invoice"}
           </h1>
-          <p className="text-slate-400 text-sm">Design invoices, select client tax rules, and pre-calculate totals.</p>
+          <p className="text-slate-500 text-sm">Design invoices, select client tax rules, and pre-calculate totals.</p>
         </div>
       </div>
 
@@ -312,18 +309,18 @@ export default function NewInvoicePage() {
         <form onSubmit={form.handleSubmit((v) => saveInvoice(v, true))} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* LEFT COLUMN: EDIT FORM */}
           <div className="lg:col-span-7 space-y-6">
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 shadow-2xl">
-              <CardHeader className="border-b border-slate-800/60 pb-4">
-                <CardTitle className="text-lg text-indigo-400 flex items-center gap-2">
-                  <FileText className="w-5 h-5" /> Invoice Metadata
+            <Card className="border-slate-200 bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <CardTitle className="text-lg text-slate-900 font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-indigo-600" /> Invoice Metadata
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-5 pt-5">
+              <CardContent className="space-y-5 pt-5 text-slate-805">
                 {/* Client selection row */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-slate-300">Select Client *</Label>
-                    <Link href="/clients/new" className="text-xs text-indigo-400 hover:underline flex items-center gap-1">
+                    <Label className="text-slate-600 font-semibold">Select Client *</Label>
+                    <Link href="/clients/new" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 font-bold">
                       <UserPlus className="w-3 h-3" /> Add New Client
                     </Link>
                   </div>
@@ -332,11 +329,11 @@ export default function NewInvoicePage() {
                     defaultValue={form.getValues("client_id")}
                   >
                     <FormControl>
-                      <SelectTrigger className="bg-slate-950 border-slate-800 text-white focus:ring-indigo-500">
+                      <SelectTrigger className="bg-white border-slate-200 text-slate-900 focus:ring-indigo-600 focus:border-slate-350 rounded-xl">
                         <SelectValue placeholder="Search and select client..." />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                    <SelectContent className="bg-white border-slate-200 text-slate-900 rounded-xl shadow-lg">
                       {clients.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
                           {c.name} {c.company_name ? `(${c.company_name})` : ""}
@@ -348,8 +345,8 @@ export default function NewInvoicePage() {
 
                   {/* Client outstanding helper status */}
                   {selectedClient && (
-                    <div className="text-[11px] text-amber-400 bg-amber-500/5 border border-amber-500/10 p-2.5 rounded-lg flex items-center gap-2 mt-1">
-                      <Building className="w-3.5 h-3.5" />
+                    <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 p-2.5 rounded-xl flex items-center gap-2 mt-1 font-medium">
+                      <Building className="w-3.5 h-3.5 text-amber-600" />
                       <span>
                         This client has Net {selectedClient.payment_terms} days terms. Outstanding:{" "}
                         <span className="font-bold">
@@ -369,11 +366,11 @@ export default function NewInvoicePage() {
                     name="invoice_number"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-300">Invoice Number *</FormLabel>
+                        <FormLabel className="text-slate-600 font-semibold">Invoice Number *</FormLabel>
                         <FormControl>
                           <Input
                             placeholder="INV-2026-001"
-                            className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono"
+                            className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 rounded-xl font-mono"
                             {...field}
                           />
                         </FormControl>
@@ -383,10 +380,10 @@ export default function NewInvoicePage() {
                   />
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Issue Date *</Label>
+                    <Label className="text-slate-600 font-semibold">Issue Date *</Label>
                     <Input
                       type="date"
-                      className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono"
+                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 rounded-xl font-mono"
                       value={watchedIssueDate}
                       onChange={handleIssueDateChange}
                     />
@@ -400,11 +397,11 @@ export default function NewInvoicePage() {
                     name="due_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-300">Due Date *</FormLabel>
+                        <FormLabel className="text-slate-600 font-semibold">Due Date *</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
-                            className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono"
+                            className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 rounded-xl font-mono"
                             {...field}
                           />
                         </FormControl>
@@ -414,28 +411,27 @@ export default function NewInvoicePage() {
                   />
 
                   <div className="space-y-2">
-                    <Label className="text-slate-300">Payment Conditions</Label>
+                    <Label className="text-slate-600 font-semibold">Payment Conditions</Label>
                     <Select
                       onValueChange={(val) => {
                         if (val === "custom") {
-                          setIsCustomTerms(true)
+                           setIsCustomTerms(true)
                         } else {
-                          setIsCustomTerms(false)
-                          if (selectedClient) {
-                            // If client has payment terms, override with what user picked
-                            const days = parseInt(val || "7")
-                            const issueStr = form.getValues("issue_date") || new Date().toISOString().split("T")[0]
-                            const due = new Date(new Date(issueStr).getTime() + days * 24 * 3600 * 1000)
-                            form.setValue("due_date", due.toISOString().split("T")[0])
-                          }
+                           setIsCustomTerms(false)
+                           if (selectedClient) {
+                             const days = parseInt(val || "7")
+                             const issueStr = form.getValues("issue_date") || new Date().toISOString().split("T")[0]
+                             const due = new Date(new Date(issueStr).getTime() + days * 24 * 3600 * 1000)
+                             form.setValue("due_date", due.toISOString().split("T")[0])
+                           }
                         }
                       }}
                       defaultValue="7"
                     >
-                      <SelectTrigger className="bg-slate-950 border-slate-800 text-white focus:ring-indigo-500">
+                      <SelectTrigger className="bg-white border-slate-200 text-slate-900 focus:ring-indigo-600 focus:border-slate-350 rounded-xl">
                         <SelectValue placeholder="Default terms" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-900 border-slate-800 text-slate-100">
+                      <SelectContent className="bg-white border-slate-200 text-slate-900 rounded-xl shadow-lg">
                         <SelectItem value="7">Net 7 Days</SelectItem>
                         <SelectItem value="15">Net 15 Days</SelectItem>
                         <SelectItem value="30">Net 30 Days</SelectItem>
@@ -449,9 +445,9 @@ export default function NewInvoicePage() {
             </Card>
 
             {/* Line items editor section */}
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 shadow-2xl">
-              <CardHeader className="border-b border-slate-800/60 pb-4">
-                <CardTitle className="text-lg text-indigo-400">Line Items Breakdown</CardTitle>
+            <Card className="border-slate-200 bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
+              <CardHeader className="border-b border-slate-100 pb-4">
+                <CardTitle className="text-lg text-slate-900 font-bold">Line Items Breakdown</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 pt-5">
                 {fields.map((field, index) => {
@@ -461,12 +457,12 @@ export default function NewInvoicePage() {
                   const lineTotal = qty * rate
 
                   return (
-                    <div key={field.id} className="grid grid-cols-12 gap-3 items-end border-b border-slate-850 pb-4 last:border-b-0 last:pb-0">
+                    <div key={field.id} className="grid grid-cols-12 gap-3 items-end border-b border-slate-100 pb-4 last:border-b-0 last:pb-0">
                       <div className="col-span-12 sm:col-span-5 space-y-1.5">
                         {index === 0 && <Label className="text-slate-400 text-xs">Item Description</Label>}
                         <Input
                           placeholder="e.g. Website Development"
-                          className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 text-xs"
+                          className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 text-xs rounded-xl"
                           {...form.register(`items.${index}.description` as const)}
                         />
                       </div>
@@ -475,7 +471,7 @@ export default function NewInvoicePage() {
                         {index === 0 && <Label className="text-slate-400 text-xs text-center w-full block">Qty</Label>}
                         <Input
                           type="number"
-                          className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono text-center text-xs"
+                          className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 font-mono text-center text-xs rounded-xl"
                           placeholder="1"
                           {...form.register(`items.${index}.quantity` as const)}
                         />
@@ -485,7 +481,7 @@ export default function NewInvoicePage() {
                         {index === 0 && <Label className="text-slate-400 text-xs text-right w-full block">Rate (₹)</Label>}
                         <Input
                           type="number"
-                          className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono text-right text-xs"
+                          className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 font-mono text-right text-xs rounded-xl"
                           placeholder="0"
                           {...form.register(`items.${index}.rate` as const)}
                         />
@@ -497,10 +493,10 @@ export default function NewInvoicePage() {
                           onValueChange={(val) => form.setValue(`items.${index}.tax_rate`, parseInt(val || "18"))}
                           defaultValue={watchedItems[index]?.tax_rate?.toString() || "18"}
                         >
-                          <SelectTrigger className="bg-slate-950 border-slate-800 text-white focus:ring-indigo-500 text-xs h-8 px-2 font-mono">
+                          <SelectTrigger className="bg-white border-slate-200 text-slate-900 focus:ring-indigo-600 text-xs h-8 px-2 font-mono rounded-xl">
                             <SelectValue placeholder="Tax%" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-900 border-slate-800 text-slate-100 min-w-[80px]">
+                          <SelectContent className="bg-white border-slate-200 text-slate-950 min-w-[80px] rounded-xl shadow-lg">
                             <SelectItem value="0">0%</SelectItem>
                             <SelectItem value="5">5%</SelectItem>
                             <SelectItem value="12">12%</SelectItem>
@@ -515,7 +511,7 @@ export default function NewInvoicePage() {
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="text-slate-500 hover:text-rose-400 h-8 w-8"
+                          className="text-slate-500 hover:text-rose-600 h-8 w-8 rounded-xl"
                           onClick={() => fields.length > 1 && remove(index)}
                           disabled={fields.length === 1}
                         >
@@ -530,7 +526,7 @@ export default function NewInvoicePage() {
                   type="button"
                   variant="outline"
                   onClick={() => append({ description: "", quantity: 1, rate: 0, tax_rate: 18, sort_order: fields.length })}
-                  className="w-full mt-2 bg-slate-950/40 border-slate-800 border-dashed hover:bg-slate-800 text-slate-300 gap-1.5 text-xs font-semibold"
+                  className="w-full mt-2 bg-slate-50 border-slate-200 border-dashed hover:bg-slate-100 text-slate-600 gap-1.5 text-xs font-bold rounded-xl shadow-sm"
                 >
                   <Plus className="w-4 h-4" /> Add Line Item
                 </Button>
@@ -538,11 +534,11 @@ export default function NewInvoicePage() {
             </Card>
 
             {/* Recurring Invoice Settings */}
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 shadow-2xl">
-              <CardHeader className="p-5 border-b border-slate-800/60 flex flex-row items-center justify-between">
+            <Card className="border-slate-200 bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
+              <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-center justify-between">
                 <div className="space-y-0.5">
-                  <CardTitle className="text-sm font-bold text-white">Automate Invoicing (Recurring)</CardTitle>
-                  <CardDescription className="text-[10px] text-slate-400">Generate and dispatch future invoices on a schedule.</CardDescription>
+                  <CardTitle className="text-sm font-bold text-slate-900">Automate Invoicing (Recurring)</CardTitle>
+                  <CardDescription className="text-[10px] text-slate-500">Generate and dispatch future invoices on a schedule.</CardDescription>
                 </div>
                 <FormField
                   control={form.control as any}
@@ -567,12 +563,12 @@ export default function NewInvoicePage() {
                     name="recurring_frequency"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-450 text-xs font-semibold">Billing Frequency</FormLabel>
+                        <FormLabel className="text-slate-600 text-xs font-semibold">Billing Frequency</FormLabel>
                         <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger className="bg-slate-950 border-slate-800 text-white text-xs w-full h-8">
+                          <SelectTrigger className="bg-white border-slate-200 text-slate-900 text-xs w-full h-8 rounded-xl">
                             <SelectValue placeholder="Select Frequency" />
                           </SelectTrigger>
-                          <SelectContent className="bg-slate-950 border-slate-800 text-white">
+                          <SelectContent className="bg-white border-slate-200 text-slate-900 rounded-xl shadow-lg">
                             <SelectItem value="weekly">Weekly</SelectItem>
                             <SelectItem value="monthly">Monthly</SelectItem>
                             <SelectItem value="quarterly">Quarterly</SelectItem>
@@ -590,11 +586,11 @@ export default function NewInvoicePage() {
                     name="recurring_start_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-450 text-xs font-semibold">First Issue Date</FormLabel>
+                        <FormLabel className="text-slate-600 text-xs font-semibold">First Issue Date</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
-                            className="bg-slate-950 border-slate-800 text-white text-xs h-8"
+                            className="bg-white border-slate-200 text-slate-905 text-xs h-8 rounded-xl font-mono"
                             {...field}
                           />
                         </FormControl>
@@ -609,12 +605,12 @@ export default function NewInvoicePage() {
                     name="recurring_end_date"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-450 text-xs font-semibold">End Date (Optional)</FormLabel>
+                        <FormLabel className="text-slate-600 text-xs font-semibold">End Date (Optional)</FormLabel>
                         <FormControl>
                           <Input
                             type="date"
                             placeholder="Until Cancelled"
-                            className="bg-slate-950 border-slate-800 text-white text-xs h-8"
+                            className="bg-white border-slate-200 text-slate-905 text-xs h-8 rounded-xl font-mono"
                             {...field}
                             value={field.value || ""}
                           />
@@ -628,7 +624,7 @@ export default function NewInvoicePage() {
             </Card>
 
             {/* Totals & Notes */}
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 shadow-2xl">
+            <Card className="border-slate-200 bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
               <CardContent className="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Notes and terms left */}
                 <div className="space-y-4">
@@ -637,9 +633,9 @@ export default function NewInvoicePage() {
                     name="notes"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-400 text-xs">Notes visible on Invoice</FormLabel>
+                        <FormLabel className="text-slate-600 font-semibold text-xs">Notes visible on Invoice</FormLabel>
                         <FormControl>
-                          <Textarea className="bg-slate-950 border-slate-800 text-white min-h-[50px] text-xs" {...field} />
+                          <Textarea className="bg-white border-slate-200 text-slate-900 min-h-[50px] text-xs rounded-xl" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -650,9 +646,9 @@ export default function NewInvoicePage() {
                     name="terms"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-slate-400 text-xs">Terms & Conditions</FormLabel>
+                        <FormLabel className="text-slate-600 font-semibold text-xs">Terms & Conditions</FormLabel>
                         <FormControl>
-                          <Textarea className="bg-slate-950 border-slate-800 text-white min-h-[50px] text-xs" {...field} />
+                          <Textarea className="bg-white border-slate-200 text-slate-900 min-h-[50px] text-xs rounded-xl" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -661,35 +657,35 @@ export default function NewInvoicePage() {
                 </div>
 
                 {/* Calculations right */}
-                <div className="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80 text-sm">
+                <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Subtotal</span>
-                    <span className="font-mono">{formatCurrency(subtotal)}</span>
+                    <span className="text-slate-500">Subtotal</span>
+                    <span className="font-semibold font-mono">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Estimated Tax (GST)</span>
-                    <span className="font-mono">{formatCurrency(taxAmount)}</span>
+                    <span className="text-slate-500">Estimated Tax (GST)</span>
+                    <span className="font-semibold font-mono">{formatCurrency(taxAmount)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-slate-400">Discount Amount (₹)</span>
+                    <span className="text-slate-500">Discount Amount (₹)</span>
                     <Input
                       type="number"
-                      className="bg-slate-950 border-slate-800 text-white focus-visible:ring-indigo-500 font-mono text-right w-24 h-7 text-xs"
+                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-650 font-mono text-right w-24 h-7 text-xs rounded-xl"
                       {...form.register("discount" as const)}
                     />
                   </div>
-                  <hr className="border-slate-850" />
-                  <div className="flex justify-between items-center text-base font-bold text-white pt-1">
+                  <hr className="border-slate-200" />
+                  <div className="flex justify-between items-center text-base font-bold text-slate-900 pt-1">
                     <span>Invoice Total</span>
-                    <span className="font-mono text-indigo-400">{formatCurrency(total)}</span>
+                    <span className="font-mono text-indigo-700">{formatCurrency(total)}</span>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t border-slate-800/60 p-5 mt-2 gap-3">
+              <CardFooter className="flex justify-between border-t border-slate-100 p-5 mt-2 gap-3">
                 <div className="flex gap-2">
                   <Button
                     type="submit"
-                    className="bg-slate-800 hover:bg-slate-700 text-white font-medium text-xs gap-1.5"
+                    className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs gap-1.5 rounded-xl shadow-sm"
                     disabled={isSaving}
                   >
                     {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -698,11 +694,11 @@ export default function NewInvoicePage() {
 
                   {/* Preview Modal for mobile */}
                   <Dialog>
-                    <DialogTrigger className={cn(buttonVariants({ variant: "outline" }), "border-slate-805 text-slate-300 hover:bg-slate-800 lg:hidden text-xs gap-1.5 cursor-pointer")}>
+                    <DialogTrigger className={cn(buttonVariants({ variant: "outline" }), "border-slate-200 text-slate-600 hover:bg-slate-50 lg:hidden text-xs gap-1.5 cursor-pointer rounded-xl shadow-sm")}>
                       <Eye className="w-3.5 h-3.5" />
                       Preview
                     </DialogTrigger>
-                    <DialogContent className="bg-slate-900 border-slate-800 text-slate-100 max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogContent className="bg-white border-slate-200 text-slate-800 max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl shadow-xl">
                       <div className="p-1">
                         <InvoiceLivePreview
                           business={business}
@@ -726,7 +722,7 @@ export default function NewInvoicePage() {
                 <Button
                   type="button"
                   onClick={form.handleSubmit((v: any) => saveInvoice(v, false))}
-                  className="bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 text-white font-medium text-xs gap-1.5"
+                  className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs gap-1.5 rounded-xl shadow-sm"
                   disabled={isSaving}
                 >
                   {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
@@ -738,10 +734,10 @@ export default function NewInvoicePage() {
 
           {/* RIGHT COLUMN: LIVE PREVIEW (Desktop only) */}
           <div className="hidden lg:block lg:col-span-5 sticky top-6">
-            <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-xl text-slate-100 shadow-2xl p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
-              <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
-                <h3 className="text-sm font-bold text-white tracking-wide uppercase flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-indigo-400" /> A4 Invoice Live Preview
+            <Card className="border-slate-200 bg-white text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-6 overflow-y-auto max-h-[calc(100vh-80px)]">
+              <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+                <h3 className="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-indigo-650" /> A4 Invoice Live Preview
                 </h3>
               </div>
               <InvoiceLivePreview

@@ -64,7 +64,7 @@ export default function DashboardLayoutClient({
   }, [router])
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col lg:flex-row">
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
       {/* Sidebar - Desktop and toggleable Mobile */}
       <div
         className={`lg:block w-60 flex-shrink-0 transition-all duration-300 z-40 ${
@@ -73,7 +73,7 @@ export default function DashboardLayoutClient({
       >
         {isMobileMenuOpen && (
           <div 
-            className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm lg:hidden z-30" 
+            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm lg:hidden z-30" 
             onClick={() => setIsMobileMenuOpen(false)} 
           />
         )}
@@ -86,7 +86,7 @@ export default function DashboardLayoutClient({
           <Button
             variant="ghost"
             size="icon"
-            className="fixed top-4 right-4 z-50 text-slate-400 hover:text-white lg:hidden bg-slate-900 border border-slate-800"
+            className="fixed top-4 right-4 z-50 text-slate-500 hover:text-slate-950 lg:hidden bg-white border border-slate-200"
             onClick={() => setIsMobileMenuOpen(false)}
           >
             <X className="w-5 h-5" />
