@@ -16,6 +16,18 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
+  // 1.5. Redirect active admin users to the admin dashboard instead of client area
+  const { data: adminUser } = await supabase
+    .from("admin_users")
+    .select("role")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle()
+
+  if (adminUser) {
+    redirect("/admin/overview")
+  }
+
   // Fetch business profile to check if onboarded
   const { data: business, error } = await supabase
     .from("businesses")

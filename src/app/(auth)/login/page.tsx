@@ -55,22 +55,33 @@ export default function LoginPage() {
         throw new Error("Login failed. User profile not found.")
       }
 
-      // 2. Check if the business record exists for this user
-      const { data: business, error: bizError } = await supabase
-        .from("businesses")
-        .select("id")
+      // 2. Check if the user is an active admin
+      const { data: adminUser } = await supabase
+        .from("admin_users")
+        .select("role")
         .eq("user_id", authData.user.id)
+        .eq("is_active", true)
         .maybeSingle()
 
-      if (bizError) {
-        throw new Error(`Auth successful, but checking business details failed: ${bizError.message}`)
-      }
-
-      // 3. Routing logic based on whether they have a business
-      if (!business) {
-        router.push("/onboarding")
+      if (adminUser) {
+        router.push("/admin/overview")
       } else {
-        router.push("/dashboard")
+        // 3. Check if the business record exists for this user
+        const { data: business, error: bizError } = await supabase
+          .from("businesses")
+          .select("id")
+          .eq("user_id", authData.user.id)
+          .maybeSingle()
+
+        if (bizError) {
+          throw new Error(`Auth successful, but checking business details failed: ${bizError.message}`)
+        }
+
+        if (!business) {
+          router.push("/onboarding")
+        } else {
+          router.push("/dashboard")
+        }
       }
       router.refresh()
     } catch (err: any) {

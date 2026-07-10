@@ -233,6 +233,11 @@ export default function NewInvoicePage() {
 
   // Save Invoice handler
   const saveInvoice = async (values: InvoiceFormValues, isDraftOnly = true) => {
+    if (!business?.upi_id || !business?.bank_name || !business?.account_number || !business?.ifsc_code) {
+      toast.error("Please configure your UPI ID and Bank Details in Settings first before creating invoices.")
+      return
+    }
+
     setIsSaving(true)
     try {
       const method = editId ? "PUT" : "POST"

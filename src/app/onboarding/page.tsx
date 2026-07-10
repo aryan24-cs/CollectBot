@@ -52,10 +52,22 @@ const step2Schema = z.object({
 })
 
 const step3Schema = z.object({
-  upi_id: z.string().email("Please enter a valid UPI ID (e.g. name@upi or name@okaxis)"),
-  bank_name: z.string().min(2, "Bank name is required"),
-  account_number: z.string().min(9, "Account number must be at least 9 digits"),
-  ifsc_code: z.string().regex(/^[A-Z]{4}0[A-Z0-9]{6}$/, "Invalid IFSC format (e.g. SBIN0001234)"),
+  upi_id: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z]{2,64}$/.test(val), {
+      message: "Please enter a valid UPI ID (e.g. name@upi)",
+    })
+    .or(z.literal("")),
+  bank_name: z.string().optional().or(z.literal("")),
+  account_number: z.string().optional().or(z.literal("")),
+  ifsc_code: z
+    .string()
+    .optional()
+    .refine((val) => !val || /^[A-Z]{4}0[A-Z0-9]{6}$/.test(val), {
+      message: "Invalid IFSC format (e.g. SBIN0001234)",
+    })
+    .or(z.literal("")),
 })
 
 export default function OnboardingPage() {
@@ -109,6 +121,19 @@ export default function OnboardingPage() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) {
           router.push("/login")
+          return
+        }
+
+        // Redirect active admin users to the admin overview
+        const { data: adminUser } = await supabase
+          .from("admin_users")
+          .select("role")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .maybeSingle()
+
+        if (adminUser) {
+          router.push("/admin/overview")
           return
         }
 
@@ -234,10 +259,10 @@ export default function OnboardingPage() {
       const { error } = await supabase
         .from("businesses")
         .update({
-          upi_id: values.upi_id,
-          bank_name: values.bank_name,
-          account_number: values.account_number,
-          ifsc_code: values.ifsc_code,
+          upi_id: values.upi_id || null,
+          bank_name: values.bank_name || null,
+          account_number: values.account_number || null,
+          ifsc_code: values.ifsc_code || null,
         })
         .eq("id", businessId)
 
