@@ -13,7 +13,7 @@ import {
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, cn } from "@/lib/utils"
 
 export default function AdminSubscriptionsPage() {
   const [data, setData] = React.useState<any>(null)
@@ -24,15 +24,12 @@ export default function AdminSubscriptionsPage() {
   const loadData = async () => {
     try {
       setLoading(true)
-      // Since subscriptions detail is part of businesses API or stats API, 
-      // we query /api/admin/businesses to aggregate subscription items
       const res = await fetch("/api/admin/businesses?limit=100")
       if (!res.ok) throw new Error("Failed to load subscription list.")
       const json = await res.json()
       
       const list = json.businesses || []
       
-      // Aggregate stats manually for UI representation
       let active = 0
       let trialing = 0
       let totalMRR = 0
@@ -83,14 +80,13 @@ export default function AdminSubscriptionsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Loader2 className="w-9 h-9 text-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-medium">Aggregating subscription logs and plan invoices...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-ink-secondary">
+        <Loader2 className="w-9 h-9 text-[#E91E63] animate-spin mb-4" />
+        <p className="text-xs font-semibold">Aggregating subscription logs and plan invoices...</p>
       </div>
     )
   }
 
-  // Filter subscriptions list
   const filteredSubs = data?.subscriptions?.filter((sub: any) => {
     const matchesSearch = sub.name.toLowerCase().includes(search.toLowerCase()) || 
                           (sub.email && sub.email.toLowerCase().includes(search.toLowerCase()))
@@ -101,64 +97,64 @@ export default function AdminSubscriptionsPage() {
   }) || []
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-ink-primary max-w-6xl mx-auto pb-10">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
+      <div className="flex justify-between items-center border-b border-[#EEE9E4] pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A] font-display flex items-center gap-2">
             Subscription Registry & MRR
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Audit customer plan lifecycles, active trial allocations, and estimated MRR volume.</p>
+          <p className="text-xs text-ink-secondary mt-1 font-semibold">Audit customer plan lifecycles, active trial allocations, and estimated MRR volume.</p>
         </div>
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* MRR */}
-        <div className="bg-[#1E293B]/40 border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Estimated MRR</span>
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
+            <span className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Estimated MRR</span>
+            <div className="p-2 rounded-lg bg-cream-50 text-ink-secondary border border-[#EEE9E4]/40">
               <DollarSign className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-white tracking-tight">{formatCurrency(data?.mrr ?? 0)}</h3>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">Aggregated from active subscriptions</p>
+            <h3 className="text-2xl font-extrabold text-[#0A0A0A] tracking-tight">{formatCurrency(data?.mrr ?? 0)}</h3>
+            <p className="text-[11px] text-ink-secondary mt-1 font-semibold">Aggregated from active subscriptions</p>
           </div>
         </div>
 
         {/* Active Premium */}
-        <div className="bg-[#1E293B]/40 border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Plans</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+            <span className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Active Plans</span>
+            <div className="p-2 rounded-lg bg-cream-50 text-ink-secondary border border-[#EEE9E4]/40">
               <CreditCard className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-white tracking-tight">{data?.activeCount ?? 0}</h3>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">Paying customer accounts</p>
+            <h3 className="text-2xl font-extrabold text-[#0A0A0A] tracking-tight">{data?.activeCount ?? 0}</h3>
+            <p className="text-[11px] text-ink-secondary mt-1 font-semibold">Paying customer accounts</p>
           </div>
         </div>
 
         {/* Trial accounts */}
-        <div className="bg-[#1E293B]/40 border border-slate-800/80 rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Trialing Users</span>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400">
+            <span className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Trialing Users</span>
+            <div className="p-2 rounded-lg bg-cream-50 text-ink-secondary border border-[#EEE9E4]/40">
               <Users className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-4">
-            <h3 className="text-2xl font-extrabold text-white tracking-tight">{data?.trialCount ?? 0}</h3>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">SaaS evaluation sessions</p>
+            <h3 className="text-2xl font-extrabold text-[#0A0A0A] tracking-tight">{data?.trialCount ?? 0}</h3>
+            <p className="text-[11px] text-ink-secondary mt-1 font-semibold">SaaS evaluation sessions</p>
           </div>
         </div>
       </div>
 
       {/* Filters bar */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 bg-white border border-[#EEE9E4] rounded-card p-4 shadow-card">
         {/* Search */}
         <div className="flex-1 relative">
           <input
@@ -166,18 +162,18 @@ export default function AdminSubscriptionsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by business name or email address..."
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg py-2 pl-9 pr-4 text-xs font-medium text-slate-300 placeholder-slate-500 focus:outline-none focus:border-slate-700 transition-all"
+            className="w-full bg-cream-50 border border-[#EEE9E4] text-ink-primary placeholder:text-ink-secondary/70 shadow-soft rounded-pill pl-10 pr-4 py-2 text-xs font-semibold focus:outline-none"
           />
-          <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5" />
+          <Search className="w-4 h-4 text-[#9B9B9B] absolute left-3.5 top-3" />
         </div>
 
         {/* Status Filter */}
         <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Status:</span>
+          <span className="text-[10px] uppercase font-bold text-ink-secondary tracking-wider">Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 focus:outline-none"
+            className="bg-white border border-[#EEE9E4] text-ink-primary shadow-soft rounded-pill px-4 py-2 text-xs font-bold focus:outline-none cursor-pointer"
           >
             <option value="all">All statuses</option>
             <option value="active">Active</option>
@@ -190,11 +186,11 @@ export default function AdminSubscriptionsPage() {
       </div>
 
       {/* Table grid */}
-      <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-[#EEE9E4] rounded-card overflow-hidden shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-800/80 bg-slate-900/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <tr className="border-b border-[#EEE9E4] bg-cream-50/50 text-[10px] font-bold text-ink-secondary uppercase tracking-widest">
                 <th className="p-4">Business name</th>
                 <th className="p-4">Assigned Tier</th>
                 <th className="p-4">Billing Price</th>
@@ -203,40 +199,41 @@ export default function AdminSubscriptionsPage() {
                 <th className="p-4 text-center">Manage</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50 text-xs font-medium text-slate-300">
+            <tbody className="divide-y divide-[#EEE9E4]/60 text-xs font-semibold text-ink-primary">
               {filteredSubs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-20 text-slate-500 italic">
+                  <td colSpan={6} className="text-center py-20 text-ink-secondary italic">
                     No subscriptions match the applied status filters.
                   </td>
                 </tr>
               ) : (
                 filteredSubs.map((sub: any) => (
-                  <tr key={sub.id} className="hover:bg-slate-800/20 transition-all">
+                  <tr key={sub.id} className="hover:bg-cream-50/30 transition-all">
                     <td className="p-4">
                       <div>
-                        <p className="font-semibold text-white">{sub.name}</p>
-                        <span className="text-[10px] text-slate-500 block mt-0.5">{sub.email || "No email"}</span>
+                        <p className="font-bold text-[#0A0A0A]">{sub.name}</p>
+                        <span className="text-[10px] text-ink-secondary block mt-0.5">{sub.email || "No email"}</span>
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className="text-[9px] font-bold uppercase bg-slate-800/55 border border-slate-700/50 px-2 py-0.5 rounded text-slate-300">
+                      <span className="text-[9px] font-bold uppercase bg-cream-100 border border-[#EEE9E4] px-2 py-0.5 rounded-pill text-ink-secondary">
                         {sub.plan}
                       </span>
                     </td>
-                    <td className="p-4 font-mono font-semibold text-white">
+                    <td className="p-4 font-mono font-bold text-[#0A0A0A]">
                       {formatCurrency(sub.price)}/mo
                     </td>
                     <td className="p-4">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide border ${
-                        sub.status === "active" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                        sub.status === "trialing" ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
-                        "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                      }`}>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider border",
+                        sub.status === "active" && "bg-[#E8F5E9] text-[#2E7D32] border-[#A5D6A7]/30",
+                        sub.status === "trialing" && "bg-[#FFF8E1] text-[#F57F17] border-[#FFC107]/20",
+                        sub.status !== "active" && sub.status !== "trialing" && "bg-[#FFEBEE] text-[#C62828] border-[#EF9A9A]/30"
+                      )}>
                         {sub.status}
                       </span>
                     </td>
-                    <td className="p-4 text-slate-400">
+                    <td className="p-4 text-ink-secondary">
                       {sub.status === "trialing" 
                         ? (sub.trial_ends ? `Trial Ends: ${formatDate(sub.trial_ends)}` : "N/A") 
                         : (sub.period_end ? `Period Ends: ${formatDate(sub.period_end)}` : "N/A")
@@ -245,7 +242,7 @@ export default function AdminSubscriptionsPage() {
                     <td className="p-4 text-center">
                       <Link
                         href={`/admin/businesses/${sub.id}`}
-                        className="inline-flex items-center justify-center p-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/60 rounded-lg text-xs font-semibold text-white transition-all shadow-sm"
+                        className="inline-flex items-center justify-center p-2 bg-white border border-[#EEE9E4] hover:bg-cream-50 rounded-pill text-ink-secondary hover:text-[#0A0A0A] transition-all shadow-soft cursor-pointer"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </Link>

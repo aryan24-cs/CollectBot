@@ -148,6 +148,16 @@ export async function POST(request: NextRequest) {
       throw createBizError
     }
 
+    // Trigger welcome email dispatch in the background
+    try {
+      const { sendWelcomeEmail } = await import("@/lib/email/send")
+      sendWelcomeEmail({ to: email, ownerName: name }).catch(err => 
+        console.error("Welcome email send failed in admin creation:", err)
+      )
+    } catch (e) {
+      console.error("Failed to import/send welcome email:", e)
+    }
+
     // 3. Assign subscription plan if not default free
     if (plan && plan !== "free") {
       const { data: planRecord } = await supabase

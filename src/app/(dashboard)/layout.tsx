@@ -16,10 +16,10 @@ export default async function DashboardLayout({
     redirect("/login")
   }
 
-  // 1.5. Redirect active admin users to the admin dashboard instead of client area
+  // CRITICAL: Check if admin — admins NEVER see this layout
   const { data: adminUser } = await supabase
     .from("admin_users")
-    .select("role")
+    .select("id")
     .eq("user_id", user.id)
     .eq("is_active", true)
     .maybeSingle()
@@ -29,28 +29,23 @@ export default async function DashboardLayout({
   }
 
   // Fetch business profile to check if onboarded
-  const { data: business, error } = await supabase
+  const { data: business } = await supabase
     .from("businesses")
-    .select("name, email")
+    .select("id, name, logo_url, email")
     .eq("user_id", user.id)
     .maybeSingle()
-
-  if (error) {
-    console.error("Dashboard layout database load error:", error)
-  }
 
   // If user has not completed onboarding, redirect to /onboarding
   if (!business) {
     redirect("/onboarding")
   }
 
-  const businessName = business.name || "My Business"
   const userEmail = business.email || user.email || ""
   const userName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User"
 
   return (
     <DashboardLayoutClient
-      businessName={businessName}
+      business={business}
       userEmail={userEmail}
       userName={userName}
     >

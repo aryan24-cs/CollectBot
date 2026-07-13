@@ -5,55 +5,78 @@ import {
   Building2, 
   FileText, 
   CreditCard, 
-  Users, 
   TrendingUp, 
   Activity, 
   RefreshCw, 
   Loader2, 
-  AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  Calendar,
+  Layers,
+  Sparkles,
+  Clock
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, cn } from "@/lib/utils"
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 
 interface StatCardProps {
   title: string
   value: string | number
   subText: string
   icon: React.ReactNode
-  colorClass: string
+  color: string
+  bgLight: string
 }
 
-function StatCard({ title, value, subText, icon, colorClass }: StatCardProps) {
+function StatCard({ title, value, subText, icon, color, bgLight }: StatCardProps) {
   return (
-    <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] hover:border-slate-350 transition-all duration-200">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</span>
-        <div className={`p-2 rounded-lg ${colorClass}`}>{icon}</div>
+    <div 
+      className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card hover:shadow-floating transition-all duration-300 flex flex-col justify-between h-40 group relative overflow-hidden"
+    >
+      <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-bl from-cream-100/50 to-transparent rounded-bl-full pointer-events-none" />
+      
+      <div className="flex items-start justify-between relative z-10">
+        <span className="text-[10px] uppercase font-bold tracking-wider text-ink-secondary">{title}</span>
+        <div className={cn("p-2.5 rounded-xl transition-all duration-300 shadow-sm border border-transparent group-hover:scale-110", bgLight, color)}>
+          {icon}
+        </div>
       </div>
-      <div className="mt-4">
-        <h3 className="text-2xl font-extrabold text-slate-900 tracking-tight">{value}</h3>
-        <p className="text-[11px] text-slate-400 mt-1 font-medium">{subText}</p>
+      <div className="relative z-10 mt-4">
+        <h3 className="text-2xl font-bold text-[#0A0A0A] tracking-tight leading-none font-display">{value}</h3>
+        <p className="text-[10px] text-ink-secondary mt-2.5 font-semibold flex items-center gap-1">
+          <span className={cn("w-1.5 h-1.5 rounded-full inline-block", color.split(" ")[0].replace("text-", "bg-"))} />
+          {subText}
+        </p>
       </div>
     </div>
   )
 }
 
 export default function AdminOverviewPage() {
-  const [data, setData] = React.useState<any>(null)
+  const [statsData, setStatsData] = React.useState<any>(null)
+  const [logsData, setLogsData] = React.useState<any[]>([])
   const [isLoading, setIsLoading] = React.useState(true)
   const [isRefreshing, setIsRefreshing] = React.useState(false)
+  const [mounted, setMounted] = React.useState(false)
 
-  const fetchStats = async (showRefreshToast = false) => {
+  const fetchStatsAndLogs = async (showRefreshToast = false) => {
     try {
       if (showRefreshToast) setIsRefreshing(true)
-      const res = await fetch("/api/admin/stats")
-      if (!res.ok) {
-        throw new Error("Failed to load statistics.")
-      }
-      const json = await res.json()
-      setData(json)
+      
+      const [statsRes, logsRes] = await Promise.all([
+        fetch("/api/admin/stats"),
+        fetch("/api/admin/logs?limit=6")
+      ])
+
+      if (!statsRes.ok) throw new Error("Failed to load statistics.")
+      const statsJson = await statsRes.ok ? await statsRes.json() : null
+      const logsJson = await logsRes.ok ? await logsRes.json() : null
+
+      setStatsData(statsJson)
+      setLogsData(logsJson?.logs || [])
+      
       if (showRefreshToast) toast.success("Dashboard metrics updated.")
     } catch (err: any) {
       toast.error(err.message || "An error occurred fetching dashboard metrics.")
@@ -64,74 +87,163 @@ export default function AdminOverviewPage() {
   }
 
   React.useEffect(() => {
-    fetchStats()
+    setMounted(true)
+    fetchStatsAndLogs()
   }, [])
 
   if (isLoading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Loader2 className="w-9 h-9 text-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-medium">Aggregating platform audit logs and metrics...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-ink-secondary animate-pulse">
+        <Loader2 className="w-10 h-10 text-[#E91E63] animate-spin mb-4" />
+        <p className="text-xs font-semibold">Aggregating platform audit logs and metrics...</p>
       </div>
     )
   }
 
-  const freeCount = data?.planDistribution?.free || 0
-  const soloCount = data?.planDistribution?.solo || 0
-  const businessCount = data?.planDistribution?.business || 0
-  const scaleCount = data?.planDistribution?.scale || 0
+  const freeCount = statsData?.planDistribution?.free || 0
+  const soloCount = statsData?.planDistribution?.solo || 0
+  const businessCount = statsData?.planDistribution?.business || 0
+  const scaleCount = statsData?.planDistribution?.scale || 0
   const totalSubs = freeCount + soloCount + businessCount + scaleCount || 1
 
+  // Format Recharts data dates for visual simplicity
+  const chartData = statsData?.growthData?.map((item: any) => {
+    const parts = item.date.split("-")
+    return {
+      name: parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.date,
+      Registrations: item.count
+    }
+  }) || []
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 select-none text-ink-primary">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-[#EEE9E4] pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-            CollectBot Admin Control Center
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">Real-time system health metrics, plan allocations, and activity telemetry.</p>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A] leading-none font-display">Console Overview</h1>
+            <div className="flex items-center gap-1.5 bg-[#FAF8F5] border border-[#EEE9E4] px-2.5 py-1 rounded-pill">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#E91E63] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#E91E63]"></span>
+              </span>
+              <span className="text-[9px] text-ink-secondary font-bold uppercase tracking-wider">Telemetry Sync Live</span>
+            </div>
+          </div>
+          <p className="text-ink-secondary text-xs mt-2 font-semibold">Real-time system health metrics, plan allocations, and activity telemetry.</p>
         </div>
+        
         <button
-          onClick={() => fetchStats(true)}
+          onClick={() => fetchStatsAndLogs(true)}
           disabled={isRefreshing}
-          className="p-2 border border-slate-200 bg-white rounded-lg hover:bg-slate-50 text-slate-500 hover:text-slate-800 shadow-sm transition-all disabled:opacity-50"
+          className="self-start sm:self-center p-2.5 bg-white border border-[#EEE9E4] hover:bg-cream-50 rounded-xl text-ink-secondary hover:text-[#0A0A0A] transition-all disabled:opacity-50 cursor-pointer shadow-soft outline-none focus:ring-1 focus:ring-[#E91E63]/40 flex items-center gap-1.5 text-xs font-bold"
         >
-          <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin text-indigo-600" : ""}`} />
+          <RefreshCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#E91E63]")} />
+          {isRefreshing ? "Syncing..." : "Sync Metrics"}
         </button>
       </div>
 
       {/* Main KPI Stats grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           title="Total Businesses"
-          value={data?.totalBusinesses ?? 0}
-          subText={`+${data?.newBusinessesThisWeek ?? 0} signed up this week`}
-          icon={<Building2 className="w-5 h-5 text-indigo-650" />}
-          colorClass="bg-indigo-50 text-indigo-650"
+          value={statsData?.totalBusinesses ?? 0}
+          subText={`+${statsData?.newBusinessesThisWeek ?? 0} registrations this week`}
+          icon={<Building2 className="w-4 h-4" />}
+          color="text-[#E91E63]"
+          bgLight="bg-[#FDF2F7]"
         />
         <StatCard
           title="Active Subscriptions"
-          value={data?.activeSubscriptions ?? 0}
-          subText="Premium features enabled"
-          icon={<TrendingUp className="w-5 h-5 text-emerald-650" />}
-          colorClass="bg-emerald-50 text-emerald-650"
+          value={statsData?.activeSubscriptions ?? 0}
+          subText="Premium SaaS accounts enabled"
+          icon={<TrendingUp className="w-4 h-4" />}
+          color="text-[#2E7D32]"
+          bgLight="bg-[#E8F5E9]"
         />
         <StatCard
           title="Invoices Generated"
-          value={data?.totalInvoices ?? 0}
-          subText={`${data?.invoicesToday ?? 0} generated today`}
-          icon={<FileText className="w-5 h-5 text-sky-650" />}
-          colorClass="bg-sky-50 text-sky-650"
+          value={statsData?.totalInvoices ?? 0}
+          subText={`${statsData?.invoicesToday ?? 0} issued today`}
+          icon={<FileText className="w-4 h-4" />}
+          color="text-[#1976D2]"
+          bgLight="bg-[#E3F2FD]"
         />
         <StatCard
           title="CollectBot Volume"
-          value={formatCurrency(data?.totalPaymentVolume ?? 0)}
-          subText="Gross volume processed"
-          icon={<CreditCard className="w-5 h-5 text-amber-650" />}
-          colorClass="bg-amber-50 text-amber-655"
+          value={formatCurrency(statsData?.totalPaymentVolume ?? 0)}
+          subText="Platform gross checkout value"
+          icon={<CreditCard className="w-4 h-4" />}
+          color="text-[#F57F17]"
+          bgLight="bg-[#FFF8E1]"
         />
       </div>
+
+      {/* Area Chart: Platform Growth */}
+      {mounted && chartData.length > 0 && (
+        <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+          <div className="flex items-center justify-between border-b border-[#EEE9E4]/60 pb-3">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0A0A0A] flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-[#E91E63]" />
+                Platform Signups Growth Trend
+              </h3>
+              <p className="text-[10px] text-ink-secondary mt-0.5 font-medium">Daily registration frequencies captured across the past 30 days.</p>
+            </div>
+            <div className="text-[10px] text-ink-secondary bg-[#FAF8F5] px-2.5 py-1 rounded-pill font-bold border border-[#EEE9E4]/50">
+              30 Days Snapshot
+            </div>
+          </div>
+          <div className="h-64 w-full pt-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="colorRegistrations" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#E91E63" stopOpacity={0.12}/>
+                    <stop offset="95%" stopColor="#E91E63" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis 
+                  dataKey="name" 
+                  stroke="#9B9B9B" 
+                  fontSize={9} 
+                  tickLine={false} 
+                  axisLine={{ stroke: '#EEE9E4' }} 
+                  dy={10}
+                />
+                <YAxis 
+                  stroke="#9B9B9B" 
+                  fontSize={9} 
+                  tickLine={false} 
+                  axisLine={{ stroke: '#EEE9E4' }} 
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#FFFFFF', 
+                    border: '1px solid #EEE9E4', 
+                    borderRadius: '12px', 
+                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
+                    fontSize: '11px',
+                    fontFamily: 'inherit',
+                    fontWeight: 'bold',
+                    color: '#1A1A1A'
+                  }}
+                  cursor={{ stroke: '#EEE9E4', strokeWidth: 1 }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="Registrations" 
+                  stroke="#E91E63" 
+                  strokeWidth={2.5} 
+                  fillOpacity={1} 
+                  fill="url(#colorRegistrations)" 
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
 
       {/* Content Columns split */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -140,25 +252,29 @@ export default function AdminOverviewPage() {
         <div className="lg:col-span-5 space-y-6">
           
           {/* Subscriptions Allocations */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight border-b border-slate-100 pb-3 flex items-center justify-between">
-              <span>SaaS Subscription Distribution</span>
-              <span className="text-[10px] text-indigo-600 uppercase tracking-widest font-extrabold">Plan counts</span>
-            </h3>
+          <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-5">
+            <div className="flex justify-between items-center border-b border-[#EEE9E4]/60 pb-3.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0A0A0A]">Subscription distribution</h3>
+              <span className="text-[9px] text-ink-secondary font-bold">Total: {totalSubs}</span>
+            </div>
+            
             <div className="space-y-4 pt-1">
               {[
-                { name: "Free Tier", count: freeCount, color: "bg-indigo-600", pct: `${Math.round((freeCount / totalSubs) * 100)}%` },
-                { name: "Solo Tier", count: soloCount, color: "bg-emerald-600", pct: `${Math.round((soloCount / totalSubs) * 100)}%` },
-                { name: "Business Tier", count: businessCount, color: "bg-amber-600", pct: `${Math.round((businessCount / totalSubs) * 100)}%` },
-                { name: "Scale Tier", count: scaleCount, color: "bg-rose-600", pct: `${Math.round((scaleCount / totalSubs) * 100)}%` },
+                { name: "Free Tier", count: freeCount, color: "bg-[#9CA3AF]", border: "border-[#374151]/20", pct: `${Math.round((freeCount / totalSubs) * 100)}%` },
+                { name: "Solo Tier", count: soloCount, color: "bg-[#4CAF50]", border: "border-[#4CAF50]/20", pct: `${Math.round((soloCount / totalSubs) * 100)}%` },
+                { name: "Business Tier", count: businessCount, color: "bg-[#FFF8E1]", pct: `${Math.round((businessCount / totalSubs) * 100)}%` },
+                { name: "Scale Tier", count: scaleCount, color: "bg-[#E91E63]", pct: `${Math.round((scaleCount / totalSubs) * 100)}%` },
               ].map((plan, idx) => (
-                <div key={idx} className="space-y-1">
-                  <div className="flex justify-between items-center text-xs font-semibold text-slate-500">
-                    <span>{plan.name}</span>
-                    <span className="text-slate-800 font-extrabold">{plan.count} ({plan.pct})</span>
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex justify-between items-center text-xs font-semibold text-ink-secondary">
+                    <span className="flex items-center gap-1.5">
+                      <span className={cn("w-2 h-2 rounded-full", plan.color)} />
+                      {plan.name}
+                    </span>
+                    <span className="text-[#0A0A0A] font-extrabold">{plan.count} ({plan.pct})</span>
                   </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-200/60">
-                    <div className={`h-full rounded-full ${plan.color}`} style={{ width: plan.pct }}></div>
+                  <div className="w-full bg-[#FAF8F5] h-2 rounded-full overflow-hidden border border-[#EEE9E4]/65">
+                    <div className={cn("h-full rounded-full", plan.color)} style={{ width: plan.pct }}></div>
                   </div>
                 </div>
               ))}
@@ -166,25 +282,25 @@ export default function AdminOverviewPage() {
           </div>
 
           {/* New Registrations Quick-view */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">Recent Onboardings</h3>
-              <Link href="/admin/businesses" className="text-[10px] text-indigo-600 font-bold hover:underline flex items-center gap-1 uppercase">
-                All Businesses <ArrowRight className="w-3 h-3" />
+          <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+            <div className="flex justify-between items-center border-b border-[#EEE9E4]/60 pb-3.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0A0A0A]">Recent Registrations</h3>
+              <Link href="/admin/businesses" className="text-[9px] text-[#E91E63] font-bold hover:underline flex items-center gap-1 uppercase tracking-wider">
+                Full list <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
             
             <div className="space-y-3 pt-1">
-              {data?.recentBusinesses?.length === 0 ? (
-                <p className="text-xs text-slate-450 italic py-3 text-center">No client registrations logged in this snapshot.</p>
+              {statsData?.recentBusinesses?.length === 0 ? (
+                <p className="text-xs text-ink-secondary italic py-3 text-center">No registrations logged in this snapshot.</p>
               ) : (
-                data?.recentBusinesses?.map((biz: any) => (
-                  <div key={biz.id} className="flex justify-between items-center border-b border-slate-100 pb-2 last:border-b-0">
+                statsData?.recentBusinesses?.slice(0, 5).map((biz: any) => (
+                  <div key={biz.id} className="flex justify-between items-center border-b border-[#EEE9E4]/30 pb-2 last:border-b-0">
                     <div>
-                      <p className="text-xs font-bold text-slate-800">{biz.name}</p>
-                      <span className="text-[10px] text-slate-500 font-medium">{biz.email || "No email"} • {biz.city || "Online"}</span>
+                      <p className="text-xs font-bold text-[#0A0A0A] leading-normal">{biz.name}</p>
+                      <span className="text-[10px] text-ink-secondary font-medium block mt-0.5">{biz.email || "No email"} • {biz.city || "Online"}</span>
                     </div>
-                    <span className="text-[9px] text-slate-650 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded font-mono">
+                    <span className="text-[9px] text-ink-secondary bg-cream-100 border border-[#EEE9E4]/60 px-2 py-0.5 rounded-pill font-mono">
                       {formatDate(biz.created_at)}
                     </span>
                   </div>
@@ -195,59 +311,47 @@ export default function AdminOverviewPage() {
 
         </div>
 
-        {/* Right Column: Timelines & Activity stream */}
+        {/* Right Column: Platform Telemetry Activity */}
         <div className="lg:col-span-7 space-y-6">
+          <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+            <div className="flex justify-between items-center border-b border-[#EEE9E4]/60 pb-3.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#0A0A0A]">Platform telemetry log</h3>
+              <Activity className="w-4 h-4 text-[#E91E63]" />
+            </div>
 
-          {/* Activity feed */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight border-b border-slate-100 pb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-indigo-650" />
-              Recent Activity Feed
-            </h3>
-            
-            <div className="space-y-4 pt-1 max-h-[380px] overflow-y-auto pr-1">
-              {data?.recentInvoices?.length === 0 ? (
-                <div className="text-center py-10 text-slate-550 text-xs italic">
-                  No invoices, payment transactions, or updates captured in the current interval.
-                </div>
+            {/* Audit log Timeline */}
+            <div className="relative pl-4 border-l border-[#EEE9E4] ml-2.5 py-2 space-y-5 pt-1 max-h-[500px] overflow-y-auto pr-1">
+              {logsData.length === 0 ? (
+                <p className="text-xs text-ink-secondary italic py-3 text-center -ml-4 border-none">No platform activity logs captured.</p>
               ) : (
-                data?.recentInvoices?.map((inv: any) => (
-                  <div key={inv.id} className="flex items-start gap-3 border-l-2 border-slate-200 pl-4 py-0.5 position-relative">
-                    <div className="flex-1">
-                      <p className="text-xs font-bold text-slate-800">
-                        Invoice <span className="font-mono text-indigo-600 font-bold">{inv.invoice_number}</span> created
-                      </p>
-                      <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                        Client: {inv.client?.name || "N/A"} • Amount: {formatCurrency(inv.total)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <span className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                        inv.status === "paid" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                        inv.status === "overdue" ? "bg-rose-50 text-rose-700 border border-rose-100" :
-                        "bg-slate-50 text-slate-650 border border-slate-200"
-                      }`}>
-                        {inv.status}
-                      </span>
-                      <p className="text-[8px] text-slate-550 font-mono mt-1">{formatDate(inv.created_at)}</p>
+                logsData.map((log: any) => (
+                  <div key={log.id} className="relative space-y-1">
+                    {/* Circle timeline dot */}
+                    <div className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-[#E91E63]" />
+                    
+                    <div className="bg-[#FAF8F5] border border-[#EEE9E4]/40 rounded-xl p-3.5 shadow-sm space-y-2 hover:border-ink-secondary/30 transition-all duration-200">
+                      <div className="flex justify-between items-start">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-[#E91E63] bg-[#FDF2F7] px-2 py-0.5 rounded-pill border border-[#F8BBD9]/20">
+                          {log.action.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-[9px] text-ink-secondary font-mono flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(log.created_at).toLocaleString("en-IN", { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      
+                      <p className="text-xs font-semibold text-[#0A0A0A] leading-relaxed">{log.description}</p>
+                      
+                      <div className="flex items-center justify-between text-[9px] text-ink-secondary border-t border-[#EEE9E4]/40 pt-2 mt-2">
+                        <span>Admin: <strong className="text-ink-primary">{log.admin_users?.name || "System"}</strong></span>
+                        <span className="font-mono">IP: {log.ip_address || "Internal"}</span>
+                      </div>
                     </div>
                   </div>
                 ))
               )}
             </div>
           </div>
-
-          {/* Operational alerts */}
-          <div className="bg-white border border-slate-200/80 rounded-xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 tracking-tight border-b border-slate-100 pb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-600" />
-              Operational & Action Logs
-            </h3>
-            <div className="text-center py-6 text-slate-500 text-xs italic">
-              All webhooks, payment callbacks, and reminder triggers are running normally. No warnings logged.
-            </div>
-          </div>
-
         </div>
 
       </div>

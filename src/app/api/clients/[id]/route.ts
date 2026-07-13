@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { clientSchema } from "@/lib/validations/client"
 
 export async function GET(
@@ -205,25 +206,67 @@ export async function DELETE(
       return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
     }
 
-    // Check if client has unpaid invoices
-    const { data: unpaidInvoices } = await supabase
-      .from("invoices")
-      .select("id, invoice_number")
-      .eq("client_id", id)
-      .in("status", ["sent", "viewed", "overdue", "partial"])
+    // Verify the client belongs to this business
+    const { data: client } = await supabase
+      .from("clients")
+      .select("id, name")
+      .eq("id", id)
+      .eq("business_id", business.id)
+      .maybeSingle()
 
-    if (unpaidInvoices && unpaidInvoices.length > 0) {
-      return NextResponse.json(
-        {
-          error: "Cannot delete client. This client has unpaid invoices. Please resolve or cancel them first.",
-          unpaidCount: unpaidInvoices.length,
-        },
-        { status: 400 }
-      )
+    if (!client) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 })
     }
 
-    // Delete client record (invoices will stay, but client_id sets to NULL due to ON DELETE SET NULL constraint)
-    const { error: deleteError } = await supabase
+    // Use service role client to bypass RLS for cascade deletion
+    const adminDb = getSupabaseServiceRoleClient()
+
+    // 1. Get all invoice IDs for this client
+    const { data: invoices } = await adminDb
+      .from("invoices")
+      .select("id")
+      .eq("client_id", id)
+
+    const invoiceIds = (invoices || []).map((inv: any) => inv.id)
+
+    if (invoiceIds.length > 0) {
+      // 2. Delete invoice_items for all invoices
+      await adminDb
+        .from("invoice_items")
+        .delete()
+        .in("invoice_id", invoiceIds)
+
+      // 3. Delete payments for all invoices
+      await adminDb
+        .from("payments")
+        .delete()
+        .in("invoice_id", invoiceIds)
+
+      // 4. Delete reminder_logs for all invoices
+      await adminDb
+        .from("reminder_logs")
+        .delete()
+        .in("invoice_id", invoiceIds)
+
+      // 5. Delete recurring_schedules linked to this client
+      try {
+        await adminDb
+          .from("recurring_schedules")
+          .delete()
+          .eq("client_id", id)
+      } catch (_) {
+        // Table may not exist, safe to skip
+      }
+
+      // 6. Delete all invoices for this client
+      await adminDb
+        .from("invoices")
+        .delete()
+        .eq("client_id", id)
+    }
+
+    // 7. Delete the client record itself
+    const { error: deleteError } = await adminDb
       .from("clients")
       .delete()
       .eq("id", id)
@@ -231,16 +274,17 @@ export async function DELETE(
 
     if (deleteError) throw deleteError
 
-    // Log activity
-    await supabase.from("activity_logs").insert({
+    // Log the deletion
+    await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "client_deleted",
-      description: `Client ID ${id} was deleted.`,
-      metadata: { client_id: id },
+      description: `Client "${client.name}" and all associated data (${invoiceIds.length} invoices) were permanently erased.`,
+      metadata: { client_id: id, invoices_deleted: invoiceIds.length },
     })
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    console.error("Client deletion error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }

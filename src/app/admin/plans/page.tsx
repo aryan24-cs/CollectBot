@@ -12,7 +12,7 @@ import {
   TrendingUp
 } from "lucide-react"
 import { toast } from "sonner"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, cn } from "@/lib/utils"
 
 export default function AdminPlansPage() {
   const [plans, setPlans] = React.useState<any[]>([])
@@ -75,9 +75,9 @@ export default function AdminPlansPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Loader2 className="w-9 h-9 text-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-medium">Retrieving product pricing models and features...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-ink-secondary">
+        <Loader2 className="w-9 h-9 text-[#E91E63] animate-spin mb-4" />
+        <p className="text-xs font-semibold">Retrieving product pricing models and features...</p>
       </div>
     )
   }
@@ -99,14 +99,14 @@ export default function AdminPlansPage() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-ink-primary max-w-6xl mx-auto pb-10">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
+      <div className="flex justify-between items-center border-b border-[#EEE9E4] pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A] font-display flex items-center gap-2">
             Pricing Plans & Feature Limits
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Configure plan display settings, client limits, monthly totals, and feature flags.</p>
+          <p className="text-xs text-ink-secondary mt-1 font-semibold">Configure plan display settings, client limits, monthly totals, and feature flags.</p>
         </div>
       </div>
 
@@ -117,19 +117,21 @@ export default function AdminPlansPage() {
           {plans.map((plan) => (
             <div 
               key={plan.id} 
-              className={`bg-[#1E293B]/30 border rounded-xl p-5 shadow-sm space-y-4 transition-all duration-200 ${
-                editingPlan?.id === plan.id ? "border-indigo-500 bg-indigo-500/5 shadow-indigo-500/5" : "border-slate-800/80 hover:border-slate-700/60"
-              }`}
+              className={cn(
+                "bg-white border rounded-card p-5 shadow-card space-y-4 transition-all duration-200",
+                editingPlan?.id === plan.id ? "border-[#E91E63] bg-[#FDF2F7]/10" : "border-[#EEE9E4] hover:border-ink-secondary/35"
+              )}
             >
               {/* Plan name */}
-              <div className="flex justify-between items-center border-b border-slate-800/60 pb-3">
+              <div className="flex justify-between items-center border-b border-[#EEE9E4]/65 pb-3">
                 <div>
-                  <h3 className="text-base font-bold text-white tracking-tight">{plan.display_name}</h3>
-                  <span className="text-[9px] text-slate-500 font-mono uppercase font-bold tracking-wider">{plan.name} Tier</span>
+                  <h3 className="text-base font-bold text-[#0A0A0A] tracking-tight">{plan.display_name}</h3>
+                  <span className="text-[9px] text-ink-secondary font-mono uppercase font-bold tracking-wider">{plan.name} Tier</span>
                 </div>
-                <span className={`px-1.5 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wide border ${
-                  plan.is_active ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : "bg-slate-800/40 text-slate-400 border-slate-700/30"
-                }`}>
+                <span className={cn(
+                  "px-2 py-0.5 rounded-pill text-[8px] font-bold uppercase tracking-wider border",
+                  plan.is_active ? "bg-[#E8F5E9] text-[#2E7D32] border-[#A5D6A7]/30" : "bg-cream-100 text-ink-secondary border-[#EEE9E4]"
+                )}>
                   {plan.is_active ? "Active" : "Disabled"}
                 </span>
               </div>
@@ -137,35 +139,35 @@ export default function AdminPlansPage() {
               {/* Price details */}
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
-                  <span className="text-[10px] text-slate-500 font-bold block uppercase">Monthly Price</span>
-                  <p className="text-white font-semibold mt-0.5">{formatCurrency(plan.price_monthly)}</p>
+                  <span className="text-[10px] text-ink-secondary font-bold block uppercase">Monthly Price</span>
+                  <p className="text-[#0A0A0A] font-bold mt-0.5">{formatCurrency(plan.price_monthly)}</p>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-500 font-bold block uppercase">Yearly Price</span>
-                  <p className="text-white font-semibold mt-0.5">{formatCurrency(plan.price_yearly)}</p>
+                  <span className="text-[10px] text-ink-secondary font-bold block uppercase">Yearly Price</span>
+                  <p className="text-[#0A0A0A] font-bold mt-0.5">{formatCurrency(plan.price_yearly)}</p>
                 </div>
               </div>
 
               {/* Limit details */}
-              <div className="bg-slate-900/40 border border-slate-850 p-3 rounded-lg text-xs space-y-1 text-slate-400 font-medium">
+              <div className="bg-[#FAF8F5] border border-[#EEE9E4]/60 p-3 rounded-card text-xs space-y-1 text-ink-secondary font-semibold">
                 <div className="flex justify-between">
                   <span>Max Invoices / mo:</span>
-                  <span className="text-white font-semibold">{plan.max_invoices_per_month === -1 ? "Unlimited" : plan.max_invoices_per_month}</span>
+                  <span className="text-[#0A0A0A] font-bold">{plan.max_invoices_per_month === -1 ? "Unlimited" : plan.max_invoices_per_month}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Max Clients:</span>
-                  <span className="text-white font-semibold">{plan.max_clients === -1 ? "Unlimited" : plan.max_clients}</span>
+                  <span className="text-[#0A0A0A] font-bold">{plan.max_clients === -1 ? "Unlimited" : plan.max_clients}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Max Team Members:</span>
-                  <span className="text-white font-semibold">{plan.max_team_members === -1 ? "Unlimited" : plan.max_team_members}</span>
+                  <span className="text-[#0A0A0A] font-bold">{plan.max_team_members === -1 ? "Unlimited" : plan.max_team_members}</span>
                 </div>
               </div>
 
               {/* Manage btn */}
               <button
                 onClick={() => handleEditClick(plan)}
-                className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700/60 rounded-lg py-2 text-xs font-semibold text-white transition-all shadow-sm flex items-center justify-center gap-1.5"
+                className="w-full bg-[#1A1A1A] hover:bg-[#0A0A0A] border-none rounded-pill py-2.5 text-xs font-bold text-white transition-all shadow-soft flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Settings2 className="w-3.5 h-3.5" />
                 Manage Plan details
@@ -177,25 +179,25 @@ export default function AdminPlansPage() {
         {/* Edit Plan Panel */}
         {editingPlan && (
           <div className="lg:col-span-6 space-y-6">
-            <div className="bg-[#1E293B]/30 border border-indigo-500/20 rounded-xl p-5 shadow-sm space-y-5">
+            <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-5">
               
               {/* Title */}
-              <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="flex justify-between items-center border-b border-[#EEE9E4] pb-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-white tracking-tight">Modify {editingPlan.display_name} Settings</h3>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Changes apply immediately to all clients on this plan tier.</p>
+                  <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight font-display">Modify {editingPlan.display_name} Settings</h3>
+                  <p className="text-[10px] text-ink-secondary mt-0.5">Changes apply immediately to all clients on this plan tier.</p>
                 </div>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditingPlan(null)}
-                    className="px-2.5 py-1.5 border border-slate-800 hover:bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white rounded transition-all"
+                    className="px-3.5 py-1.5 border border-[#EEE9E4] hover:bg-cream-50 text-[10px] font-bold text-ink-secondary hover:text-[#0A0A0A] rounded-pill transition-all cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleSavePlan}
                     disabled={saving}
-                    className="px-3 py-1.5 bg-indigo-650 hover:bg-indigo-500 text-white rounded text-[10px] font-bold shadow-sm transition-all flex items-center gap-1"
+                    className="px-4 py-1.5 bg-[#E91E63] hover:bg-[#D81B60] text-white rounded-pill text-[10px] font-bold shadow-soft transition-all flex items-center gap-1.5 border-none cursor-pointer"
                   >
                     <Save className="w-3 h-3" />
                     {saving ? "Saving..." : "Save details"}
@@ -207,72 +209,72 @@ export default function AdminPlansPage() {
               <div className="space-y-4">
                 
                 {/* Display Name */}
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 uppercase font-bold block">Display Name</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] text-ink-secondary uppercase font-bold block">Display Name</label>
                   <input
                     type="text"
                     value={editingPlan.display_name}
                     onChange={(e) => setEditingPlan({ ...editingPlan, display_name: e.target.value })}
-                    className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 placeholder-slate-650 focus:outline-none focus:border-slate-700"
+                    className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary placeholder:text-ink-secondary/50 focus:outline-none"
                   />
                 </div>
 
                 {/* Price Monthly / Yearly */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500 uppercase font-bold block">Monthly Price (INR)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-ink-secondary uppercase font-bold block">Monthly Price (INR)</label>
                     <input
                       type="number"
                       value={editingPlan.price_monthly}
                       onChange={(e) => setEditingPlan({ ...editingPlan, price_monthly: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-slate-500 uppercase font-bold block">Yearly Price (INR)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] text-ink-secondary uppercase font-bold block">Yearly Price (INR)</label>
                     <input
                       type="number"
                       value={editingPlan.price_yearly}
                       onChange={(e) => setEditingPlan({ ...editingPlan, price_yearly: parseFloat(e.target.value) || 0 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Invoices limit */}
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-slate-500 uppercase font-bold block">Max Invoices (-1=Unlim)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] text-ink-secondary uppercase font-bold block">Max Invoices (-1=Unlim)</label>
                     <input
                       type="number"
                       value={editingPlan.max_invoices_per_month}
                       onChange={(e) => setEditingPlan({ ...editingPlan, max_invoices_per_month: parseInt(e.target.value) || -1 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-slate-500 uppercase font-bold block">Max Clients (-1=Unlim)</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] text-ink-secondary uppercase font-bold block">Max Clients (-1=Unlim)</label>
                     <input
                       type="number"
                       value={editingPlan.max_clients}
                       onChange={(e) => setEditingPlan({ ...editingPlan, max_clients: parseInt(e.target.value) || -1 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[9px] text-slate-500 uppercase font-bold block">Max Team members</label>
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] text-ink-secondary uppercase font-bold block">Max Team members</label>
                     <input
                       type="number"
                       value={editingPlan.max_team_members}
                       onChange={(e) => setEditingPlan({ ...editingPlan, max_team_members: parseInt(e.target.value) || -1 })}
-                      className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                      className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                     />
                   </div>
                 </div>
 
                 {/* Features toggles */}
-                <div className="space-y-2.5 border-t border-slate-800 pt-3">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Included Features flags</span>
+                <div className="space-y-2.5 border-t border-[#EEE9E4] pt-3">
+                  <span className="text-[10px] text-ink-secondary uppercase font-bold block">Included Features flags</span>
                   <div className="grid grid-cols-2 gap-3">
                     {configurableFeatures.map((feat) => {
                       const enabled = Boolean(editingPlan[`feature_${feat.key}`])
@@ -281,13 +283,15 @@ export default function AdminPlansPage() {
                         <div 
                           key={feat.key}
                           onClick={() => toggleFeature(feat.key)}
-                          className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs font-medium cursor-pointer select-none transition-all ${
-                            enabled ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400" : "bg-slate-900/30 border-slate-800 text-slate-500"
-                          }`}
+                          className={cn(
+                            "flex items-center gap-2 p-2.5 rounded-card border text-xs font-semibold cursor-pointer select-none transition-all",
+                            enabled ? "bg-[#FDF2F7] border-[#E91E63]/25 text-[#E91E63]" : "bg-white border-[#EEE9E4] text-ink-secondary hover:bg-cream-50/50"
+                          )}
                         >
-                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center border text-[9px] ${
-                            enabled ? "bg-indigo-500 border-indigo-650 text-white" : "border-slate-700 bg-slate-900"
-                          }`}>
+                          <span className={cn(
+                            "w-4 h-4 rounded flex items-center justify-center border text-[9px]",
+                            enabled ? "bg-[#E91E63] border-[#E91E63] text-white" : "border-[#EEE9E4] bg-cream-50"
+                          )}>
                             {enabled && <Check className="w-2.5 h-2.5" />}
                           </span>
                           {feat.label}

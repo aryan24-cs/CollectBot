@@ -129,24 +129,86 @@ export async function DELETE(
       return NextResponse.json({ error: "Business not found" }, { status: 404 })
     }
 
-    // 2. Delete the user from auth.users (requires service role)
-    // Deleting the auth user automatically cascades and deletes the businesses row and all other data tables!
+    // 2. Fetch invoice IDs of this business to delete associated reminder logs
+    const { data: invoices } = await supabase
+      .from("invoices")
+      .select("id")
+      .eq("business_id", businessId)
+
+    const invoiceIds = (invoices || []).map(inv => inv.id)
+
+    // 3. Delete reminder logs referencing invoices
+    if (invoiceIds.length > 0) {
+      const { error: deleteRemLogsErr } = await supabase
+        .from("reminder_logs")
+        .delete()
+        .in("invoice_id", invoiceIds)
+      if (deleteRemLogsErr) {
+        throw new Error(`Failed to delete reminder logs: ${deleteRemLogsErr.message}`)
+      }
+    }
+
+    // 4. Delete all other dependent entities sequentially with explicit error checking
+    const tablesToDelete = [
+      "reminder_logs",
+      "activity_logs",
+      "notification_settings",
+      "team_members",
+      "business_feature_overrides",
+      "payments",
+      "subscriptions",
+      "recurring_schedules"
+    ]
+
+    for (const table of tablesToDelete) {
+      // Check if table exists by doing a select first to avoid failures if optional features tables aren't present
+      const { error: checkErr } = await supabase.from(table).select("id").limit(1)
+      if (checkErr && checkErr.code === "42P01") {
+        // Table does not exist (relation does not exist) - skip it safely
+        continue
+      }
+
+      const { error: deleteErr } = await supabase
+        .from(table)
+        .delete()
+        .eq("business_id", businessId)
+      if (deleteErr) {
+        throw new Error(`Failed to delete records from ${table}: ${deleteErr.message}`)
+      }
+    }
+
+    // 5. Delete invoices and clients
+    const { error: deleteInvsErr } = await supabase
+      .from("invoices")
+      .delete()
+      .eq("business_id", businessId)
+    if (deleteInvsErr) {
+      throw new Error(`Failed to delete invoices: ${deleteInvsErr.message}`)
+    }
+
+    const { error: deleteClisErr } = await supabase
+      .from("clients")
+      .delete()
+      .eq("business_id", businessId)
+    if (deleteClisErr) {
+      throw new Error(`Failed to delete clients: ${deleteClisErr.message}`)
+    }
+
+    // 6. Delete the business record directly
+    const { error: deleteBizError } = await supabase
+      .from("businesses")
+      .delete()
+      .eq("id", businessId)
+    if (deleteBizError) {
+      throw new Error(`Failed to delete business: ${deleteBizError.message}`)
+    }
+
+    // 7. Delete the auth user
     if (business.user_id) {
       const { error: deleteUserError } = await supabase.auth.admin.deleteUser(business.user_id)
       if (deleteUserError) {
-        console.warn("Auth user delete failed, trying to delete business directly:", deleteUserError)
-        const { error: deleteBizError } = await supabase
-          .from("businesses")
-          .delete()
-          .eq("id", businessId)
-        if (deleteBizError) throw deleteBizError
+        console.warn("Auth user delete failed:", deleteUserError)
       }
-    } else {
-      const { error: deleteBizError } = await supabase
-        .from("businesses")
-        .delete()
-        .eq("id", businessId)
-      if (deleteBizError) throw deleteBizError
     }
 
     await logAdminAction({
@@ -159,6 +221,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true, message: "Business deleted successfully" })
   } catch (err: any) {
+    console.error("Delete business error:", err)
     return NextResponse.json(
       { error: err.message || "Failed to delete business" },
       { status: 500 }

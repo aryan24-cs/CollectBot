@@ -2,30 +2,26 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { 
-  FileText, 
   Plus, 
   Search, 
   Trash2, 
   Send, 
   CheckCircle, 
   Eye, 
-  Download, 
   ChevronLeft, 
   ChevronRight,
   MoreVertical,
   Loader2,
-  Calendar,
   AlertTriangle,
-  MailCheck,
-  Edit3
+  Edit3,
+  FileText
 } from "lucide-react"
 import { toast } from "sonner"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -44,37 +40,38 @@ import {
   formatCurrency, 
   formatDateShort, 
   getDaysOverdue, 
-  getInvoiceStatusColor, 
   cn 
 } from "@/lib/utils"
 import { Invoice } from "@/types"
+import FilterPills from "@/components/shared/FilterPills"
+import StatCard from "@/components/shared/StatCard"
+import EmptyState from "@/components/shared/EmptyState"
 
 export default function InvoicesPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const initialStatus = searchParams.get("status") || "all"
+  const initialSearch = searchParams.get("search") || ""
+
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
   const [totalCount, setTotalCount] = React.useState(0)
   const [isLoading, setIsLoading] = React.useState(true)
 
   // Filtering & Search
-  const [searchQuery, setSearchQuery] = React.useState("")
-  const [debouncedSearch, setDebouncedSearch] = React.useState("")
-  const [statusTab, setStatusTab] = React.useState("all") // all, draft, sent, paid, overdue
+  const [searchQuery, setSearchQuery] = React.useState(initialSearch)
+  const [debouncedSearch, setDebouncedSearch] = React.useState(initialSearch)
+  const [statusTab, setStatusTab] = React.useState(initialStatus)
   const [currentPage, setCurrentPage] = React.useState(1)
-  const limit = 20
+  const limit = 12
 
-  // Selection states
-  const [selectedIds, setSelectedIds] = React.useState<string[]>([])
-  
   // Dialog Actions
   const [invoiceToDelete, setInvoiceToDelete] = React.useState<Invoice | null>(null)
   const [isDeleting, setIsDeleting] = React.useState(false)
-  const [bulkActionType, setBulkActionType] = React.useState<"delete" | "send" | null>(null)
-  const [isBulkProcessing, setIsBulkProcessing] = React.useState(false)
 
   // Stats
   const [stats, setStats] = React.useState({
-    totalThisMonth: 0,
-    collectedThisMonth: 0,
+    totalInvoiced: 0,
+    collected: 0,
     outstanding: 0,
     overdue: 0,
   })
@@ -88,7 +85,15 @@ export default function InvoicesPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Fetch Invoices & recalculate summary stats
+  // Sync state with URL params if they change
+  React.useEffect(() => {
+    const urlStatus = searchParams.get("status") || "all"
+    const urlSearch = searchParams.get("search") || ""
+    setStatusTab(urlStatus)
+    setSearchQuery(urlSearch)
+  }, [searchParams])
+
+  // Fetch Invoices & recalculate summary stats from real data
   const fetchInvoices = React.useCallback(async () => {
     setIsLoading(true)
     try {
@@ -104,49 +109,40 @@ export default function InvoicesPage() {
       setInvoices(data.invoices || [])
       setTotalCount(data.totalCount || 0)
 
-      // Calculate stats based on all invoices (mock calculations for display, Phase 4 will link detailed analytics)
-      // Fetch all invoices unfiltered for stats calculation
+      // Fetch all invoices to compute true stats totals
       const allRes = await fetch("/api/invoices?limit=1000")
       if (allRes.ok) {
         const allData = await allRes.json()
         const allInvs: Invoice[] = allData.invoices || []
         
-        const currentMonth = new Date().getMonth()
-        const currentYear = new Date().getFullYear()
-
-        let totalThisMonth = 0
-        let collectedThisMonth = 0
+        let totalInvoiced = 0
+        let collected = 0
         let outstanding = 0
         let overdue = 0
 
         allInvs.forEach((inv) => {
-          const invDate = new Date(inv.issue_date)
-          const invMonth = invDate.getMonth()
-          const invYear = invDate.getFullYear()
           const totalVal = Number(inv.total) || 0
           const paidVal = Number(inv.amount_paid) || 0
           const dueVal = Number(inv.balance_due) || 0
 
-          if (invMonth === currentMonth && invYear === currentYear && inv.status !== "cancelled") {
-            totalThisMonth += totalVal
-            if (inv.status === "paid") {
-              collectedThisMonth += totalVal
+          if (inv.status !== "cancelled") {
+            totalInvoiced += totalVal
+            collected += paidVal
+
+            if (["sent", "viewed", "overdue", "partial"].includes(inv.status)) {
+              outstanding += dueVal
             }
-          }
 
-          if (["sent", "viewed", "overdue", "partial"].includes(inv.status)) {
-            outstanding += dueVal
-          }
-
-          const overdueDays = getDaysOverdue(inv.due_date)
-          if ((inv.status === "overdue" || (["sent", "viewed"].includes(inv.status) && overdueDays > 0))) {
-            overdue += dueVal
+            const overdueDays = getDaysOverdue(inv.due_date)
+            if (inv.status === "overdue" || (["sent", "viewed", "partial"].includes(inv.status) && overdueDays > 0)) {
+              overdue += dueVal
+            }
           }
         })
 
         setStats({
-          totalThisMonth,
-          collectedThisMonth,
+          totalInvoiced,
+          collected,
           outstanding,
           overdue,
         })
@@ -163,7 +159,6 @@ export default function InvoicesPage() {
     fetchInvoices()
   }, [fetchInvoices])
 
-  // Single delete
   const handleDeleteInvoice = async () => {
     if (!invoiceToDelete) return
     setIsDeleting(true)
@@ -182,407 +177,333 @@ export default function InvoicesPage() {
     }
   }
 
-  // Bulk actions handlers
-  const handleBulkAction = async () => {
-    if (selectedIds.length === 0 || !bulkActionType) return
-    setIsBulkProcessing(true)
+  const handleMarkPaid = async (id: string, amount: number) => {
     try {
-      if (bulkActionType === "delete") {
-        let successCount = 0
-        let failCount = 0
-        for (const id of selectedIds) {
-          const res = await fetch(`/api/invoices/${id}`, { method: "DELETE" })
-          if (res.ok) successCount++
-          else failCount++
-        }
-        toast.success(`Bulk Delete: Deleted ${successCount} invoices.${failCount > 0 ? ` Failed: ${failCount} (Only drafts/cancelled allowed).` : ""}`)
-      } else if (bulkActionType === "send") {
-        // Stub for sending invoices (WhatsApp alerts in Phase 4)
-        // Mark as sent in DB
-        let successCount = 0
-        for (const id of selectedIds) {
-          const res = await fetch(`/api/invoices/${id}`)
-          if (res.ok) {
-            const inv = await res.json()
-            if (inv.status === "draft") {
-              await fetch(`/api/invoices/${id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...inv, status: "sent" }),
-              })
-              successCount++
-            }
-          }
-        }
-        toast.success(`Bulk Send: Dispatched ${successCount} invoices. WhatsApp automation queued!`)
+      const res = await fetch(`/api/invoices/${id}/mark-paid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          amount,
+          payment_method: "manual",
+          payment_date: new Date().toISOString(),
+          notes: "Marked as paid from invoice registry console",
+        }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to mark as paid")
       }
-      setSelectedIds([])
-      setBulkActionType(null)
+
+      toast.success("Invoice was successfully marked as paid.")
       fetchInvoices()
     } catch (err: any) {
-      toast.error("Bulk action failed.")
-    } finally {
-      setIsBulkProcessing(false)
+      toast.error(err.message || "Could not update payment status.")
     }
   }
 
-  const handleMarkPaid = async (id: string) => {
+  const handleSendInvoice = async (id: string, invoiceNumber: string) => {
     try {
-      const res = await fetch(`/api/invoices/${id}`)
-      if (!res.ok) throw new Error("Invoice details not found")
-      const inv = await res.json()
-      
-      // Update status to paid and zero balance_due
-      // PUT API only allows editing drafts, so let's bypass in routes or use PUT. Wait! Since PUT in route.ts only allows editing if status is draft, let's see how we can mark paid.
-      // Wait, we can implement mark paid in PUT or create a separate route, or let PUT accept status paid if updating balance.
-      // Wait, in my put route: "Only invoices in 'draft' status can be modified."
-      // So to mark paid, we should write an update or bypass. Since we are developers, let's look at `api/invoices/[id]/route.ts`. Can we update a sent/viewed invoice to 'paid'?
-      // Oh! In standard workflow, we can mark an invoice as paid.
-      // Let's check `api/invoices/[id]/route.ts`:
-      // `if (existingInvoice.status !== "draft")`
-      // Wait, if it is not a draft, can we update status?
-      // Normally, yes! If the user wants to mark paid, we want to allow it. Let's make sure our PUT route allows changing status, or write a dedicated endpoint `/api/invoices/[id]/pay` or edit the PUT route to allow status transitions like paid or cancelled.
-      // Wait, let's look at the PUT route. It blocks modifications if status !== "draft". But let's check: can we make PUT route allow updating the status from `sent` to `paid` if they are only changing status?
-      // Yes! Let's handle it or write a simple PUT update.
-      // Let's create an endpoint or allow it. I will write a PUT request to update status directly. Let's make sure we can do it.
+      const res = await fetch(`/api/invoices/${id}/send`, { method: "POST" })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to dispatch invoice")
+      }
+      toast.success(`Invoice "${invoiceNumber}" was successfully sent to client.`)
+      fetchInvoices()
     } catch (err: any) {
-      toast.error("Could not mark invoice as paid.")
+      toast.error(err.message || "Failed to send invoice.")
     }
   }
 
-  // Toggle selection
-  const handleSelectRow = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter((item) => item !== id))
-    } else {
-      setSelectedIds([...selectedIds, id])
-    }
-  }
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === invoices.length) {
-      setSelectedIds([])
-    } else {
-      setSelectedIds(invoices.map((inv) => inv.id))
+  const handleSendReminder = async (id: string, invoiceNumber: string) => {
+    try {
+      const res = await fetch(`/api/invoices/${id}/remind`, { method: "POST" })
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || "Failed to trigger reminder")
+      }
+      toast.success(`WhatsApp reminder queued for Invoice "${invoiceNumber}"!`)
+    } catch (err: any) {
+      toast.error(err.message || "Could not dispatch reminder.")
     }
   }
 
   const totalPages = Math.ceil(totalCount / limit)
 
-  // Empty state labels
-  const getEmptyStateText = () => {
-    switch (statusTab) {
-      case "draft":
-        return "No draft invoices. Create one to get started!"
-      case "overdue":
-        return "Great! No overdue invoices found 🎉"
-      case "paid":
-        return "No paid invoices recorded yet."
-      case "sent":
-        return "No sent invoices. Dispatched templates show here."
-      default:
-        return "No invoices created yet. Press 'Create Invoice' to build one."
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "paid": return "success"
+      case "sent": return "default"
+      case "viewed": return "secondary"
+      case "overdue": return "destructive"
+      default: return "outline"
     }
   }
 
   return (
-    <div className="space-y-6 select-none">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10">
+      
       {/* Header section with Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-surface-border/50 pb-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Invoices</h1>
-          <p className="text-slate-500 text-sm">Issue itemized bills, capture client receipts, and run auto-reconciliation.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-ink-black leading-tight">Invoices</h1>
+          <p className="text-ink-secondary text-sm">Issue itemized bills, capture client receipts, and run auto-reconciliation.</p>
         </div>
         <Link
           href="/invoices/new"
-          className={cn(
-            buttonVariants({ variant: "default" }),
-            "bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl gap-2 shadow-sm font-semibold"
-          )}
+          className="btn-primary px-4 py-2.5 rounded-button text-xs font-bold gap-2"
         >
           <Plus className="w-4 h-4" />
-          Create Invoice
+          New Invoice
         </Link>
       </div>
 
       {/* Invoice Stats Summary Cards */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
-          <div className="text-xs text-slate-500 font-semibold mb-1">Invoiced This Month</div>
-          <div className="text-xl font-bold font-mono text-slate-900">{formatCurrency(stats.totalThisMonth)}</div>
-        </Card>
-        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
-          <div className="text-xs text-slate-500 font-semibold mb-1">Collected This Month</div>
-          <div className="text-xl font-bold font-mono text-emerald-700">{formatCurrency(stats.collectedThisMonth)}</div>
-        </Card>
-        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
-          <div className="text-xs text-slate-500 font-semibold mb-1">Outstanding Balance</div>
-          <div className="text-xl font-bold font-mono text-amber-700">{formatCurrency(stats.outstanding)}</div>
-        </Card>
-        <Card className="bg-white border-slate-200 text-slate-800 shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl p-4">
-          <div className="text-xs text-slate-500 font-semibold mb-1">Overdue Amount</div>
-          <div className="text-xl font-bold font-mono text-rose-600">{formatCurrency(stats.overdue)}</div>
-        </Card>
+      <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Billed"
+          value={formatCurrency(stats.totalInvoiced)}
+          subtext="Total lifetime billing volume"
+        />
+        <StatCard
+          title="Total Collected"
+          value={formatCurrency(stats.collected)}
+          subtext="Cleared collections volume"
+          trend={{ value: "Positive", isPositive: true }}
+        />
+        <StatCard
+          title="Outstanding Balance"
+          value={formatCurrency(stats.outstanding)}
+          subtext="Unpaid invoice balances"
+        />
+        <StatCard
+          title="Overdue Amount"
+          value={formatCurrency(stats.overdue)}
+          subtext="Expired invoice volumes"
+          isDark={stats.overdue > 0}
+        />
       </div>
 
       {/* Filter Tabs & Search */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white border border-slate-200/80 p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.01)]">
-        {/* Tabs */}
-        <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-200/60 w-full sm:w-auto">
-          {["all", "draft", "sent", "paid", "overdue"].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => { setStatusTab(tab); setCurrentPage(1); setSelectedIds([]) }}
-              className={cn(
-                "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex-1 sm:flex-none text-center",
-                statusTab === tab
-                  ? "bg-white text-indigo-700 border border-slate-200 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800"
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-surface-white border border-surface-border/50 p-4 rounded-card shadow-card">
+        {/* Filter Pills */}
+        <FilterPills
+          options={[
+            { id: "all", label: "All Invoices" },
+            { id: "draft", label: "Draft" },
+            { id: "sent", label: "Sent" },
+            { id: "paid", label: "Paid" },
+            { id: "overdue", label: "Overdue" }
+          ]}
+          selectedId={statusTab}
+          onSelect={(id) => { setStatusTab(id); setCurrentPage(1) }}
+        />
 
         {/* Search */}
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <Input
+        <div className="relative w-full sm:max-w-xs shrink-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" />
+          <input
+            type="text"
             placeholder="Search invoice # or client name..."
-            className="pl-10 bg-white border border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350 placeholder:text-slate-400 text-xs rounded-xl"
+            className="w-full bg-cream-50 rounded-button pl-10 pr-4 py-2.5 text-xs text-ink-primary placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Bulk actions status panel */}
-      {selectedIds.length > 0 && (
-        <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-100 p-3 rounded-xl text-xs justify-between animate-fadeIn text-indigo-700">
+      {/* Invoices List Grid */}
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-surface-white border border-surface-border/50 rounded-card p-6 h-56 animate-pulse space-y-4">
+              <div className="flex justify-between items-center">
+                <div className="w-10 h-10 rounded-full bg-cream-200" />
+                <div className="w-16 h-5 bg-cream-200 rounded" />
+              </div>
+              <div className="h-4 bg-cream-200 rounded w-1/3" />
+              <div className="h-6 bg-cream-200 rounded w-2/3" />
+            </div>
+          ))}
+        </div>
+      ) : invoices.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="No Invoices Found"
+          description={
+            statusTab === "all"
+              ? "Draft your first client invoice billing to track cashflow."
+              : `You do not have any invoices matching status: "${statusTab}"`
+          }
+          actionLabel={statusTab === "all" ? "Create New Invoice" : undefined}
+          onActionClick={statusTab === "all" ? () => router.push("/invoices/new") : undefined}
+        />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {invoices.map((inv) => {
+            const daysOver = getDaysOverdue(inv.due_date)
+            const isOver = (inv.status === "overdue" || (["sent", "viewed", "partial"].includes(inv.status) && daysOver > 0))
+            const initials = inv.client?.name
+              ? inv.client.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+              : "CL"
+            
+            return (
+              <div 
+                key={inv.id}
+                className="bg-surface-white hover:bg-surface-soft border border-surface-border/50 hover:border-brand-300 rounded-card p-6 shadow-card hover:shadow-card-hover hover:-translate-y-0.5 transition-all flex flex-col justify-between h-56 group relative"
+              >
+                {/* Header: Client info & actions trigger */}
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-10 h-10 bg-brand-50 border border-brand-100 text-brand-600 font-extrabold text-xs">
+                      <AvatarFallback>{initials}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-ink-black truncate">
+                        {inv.client?.name || <span className="text-ink-muted italic">Deleted Client</span>}
+                      </h4>
+                      <p className="text-[10px] text-ink-secondary truncate">
+                        {inv.client?.company_name || "Freelancer"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Options */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="p-1 rounded-lg hover:bg-cream-200/50 text-ink-secondary hover:text-ink-primary cursor-pointer transition-colors border-none outline-none">
+                      <MoreVertical className="w-4 h-4" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="bg-white border border-surface-border text-ink-primary w-40 rounded-xl shadow-floating z-50">
+                      <DropdownMenuItem onClick={() => router.push(`/invoices/${inv.id}`)} className="cursor-pointer text-xs py-2">
+                        <Eye className="w-4 h-4 mr-2 text-ink-secondary" />
+                        View Details
+                      </DropdownMenuItem>
+                      {inv.status === "draft" && (
+                        <DropdownMenuItem onClick={() => router.push(`/invoices/new?editId=${inv.id}`)} className="cursor-pointer text-xs py-2">
+                          <Edit3 className="w-4 h-4 mr-2 text-ink-secondary" />
+                          Edit Invoice
+                        </DropdownMenuItem>
+                      )}
+                      {["sent", "viewed", "overdue", "partial"].includes(inv.status) && (
+                        <DropdownMenuItem onClick={() => handleMarkPaid(inv.id, Number(inv.total))} className="cursor-pointer text-xs py-2 text-success font-semibold">
+                          <CheckCircle className="w-4 h-4 mr-2 text-success" />
+                          Mark Paid
+                        </DropdownMenuItem>
+                      )}
+                      {(inv.status === "draft" || inv.status === "cancelled") && (
+                        <DropdownMenuItem onClick={() => setInvoiceToDelete(inv)} className="cursor-pointer text-xs py-2 text-danger font-semibold">
+                          <Trash2 className="w-4 h-4 mr-2 text-danger" />
+                          Delete
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Middle details: amount, status */}
+                <div className="my-2 space-y-1">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[10px] font-bold text-brand-600 font-mono">
+                      #{inv.invoice_number}
+                    </span>
+                    <span className="text-lg font-extrabold text-ink-black font-display">
+                      {formatCurrency(Number(inv.total) || 0)}
+                    </span>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-[10px] text-ink-secondary">
+                    <span>Due: {formatDateShort(inv.due_date)}</span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-pill text-[9px] font-extrabold tracking-wider uppercase border border-transparent",
+                      inv.status === "paid" && "bg-success-light text-success-dark",
+                      inv.status === "sent" && "bg-info-light text-info-dark",
+                      inv.status === "viewed" && "bg-info-light text-info-dark",
+                      inv.status === "overdue" && "bg-danger-light text-danger-dark animate-pulse",
+                      inv.status === "draft" && "bg-cream-200 text-ink-secondary",
+                      inv.status === "cancelled" && "bg-cream-200 text-ink-muted",
+                      inv.status === "partial" && "bg-warning-light text-warning-dark"
+                    )}>
+                      {inv.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Footer options: inline action buttons */}
+                <div className="border-t border-surface-border/50 pt-3 flex items-center justify-between gap-2 mt-auto">
+                  <div className="flex gap-1.5 w-full">
+                    {inv.status === "draft" && (
+                      <button 
+                        onClick={() => handleSendInvoice(inv.id, inv.invoice_number)}
+                        className="w-1/2 bg-[#1A1A1A] hover:bg-[#0A0A0A] text-white text-[10px] py-2 rounded-pill font-bold shadow-soft transition-all cursor-pointer inline-flex items-center justify-center gap-1 border-none"
+                      >
+                        <Send className="w-3 h-3" />
+                        Send Invoice
+                      </button>
+                    )}
+                    {["sent", "viewed", "overdue", "partial"].includes(inv.status) && (
+                      <button 
+                        onClick={() => handleSendReminder(inv.id, inv.invoice_number)}
+                        className="w-1/2 bg-[#1A1A1A] hover:bg-[#0A0A0A] text-white text-[10px] py-2 rounded-pill font-bold shadow-soft transition-all cursor-pointer inline-flex items-center justify-center gap-1 border-none"
+                      >
+                        <Send className="w-3 h-3 text-brand-400" />
+                        Send Reminder
+                      </button>
+                    )}
+                    {inv.status === "paid" && (
+                      <div className="w-1/2 text-success font-bold text-[10px] flex items-center justify-center gap-1">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Paid & Cleared
+                      </div>
+                    )}
+                    <button
+                      onClick={() => router.push(`/invoices/${inv.id}`)}
+                      className="w-1/2 bg-surface-white border border-surface-border hover:bg-cream-50 text-ink-primary text-[10px] py-2 rounded-pill font-bold shadow-soft transition-all cursor-pointer"
+                    >
+                      View Details
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Pagination Bar */}
+      {!isLoading && totalPages > 1 && (
+        <div className="flex items-center justify-between px-6 py-4 bg-surface-white border border-surface-border/50 rounded-card shadow-card text-xs text-ink-secondary">
           <div>
-            Selected <span className="font-bold text-indigo-900">{selectedIds.length}</span> invoices
+            Showing page <span className="font-bold text-ink-primary">{currentPage}</span> of{" "}
+            <span className="font-bold text-ink-primary">{totalPages}</span> ({totalCount} total invoices)
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              size="xs"
-              className="bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-[10px] rounded-xl shadow-sm"
-              onClick={() => { setBulkActionType("send"); handleBulkAction() }}
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
             >
-              <Send className="w-3 h-3 mr-1" />
-              Bulk Send
+              <ChevronLeft className="w-4 h-4" />
             </Button>
             <Button
               variant="outline"
-              size="xs"
-              className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 text-[10px] rounded-xl shadow-sm"
-              onClick={() => setBulkActionType("delete")}
+              size="sm"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
             >
-              <Trash2 className="w-3 h-3 mr-1" />
-              Bulk Delete
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* Invoices List Table Card */}
-      <Card className="border-slate-200 bg-white text-slate-800 overflow-hidden shadow-[0_2px_8px_rgba(0,0,0,0.01)] rounded-2xl">
-        <CardContent className="p-0">
-          {isLoading ? (
-            /* Loading Skeleton */
-            <div className="p-8 space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4 animate-pulse">
-                  <div className="w-5 h-5 bg-slate-200 rounded" />
-                  <div className="flex-grow space-y-2">
-                    <div className="h-4 bg-slate-200 rounded w-1/5" />
-                    <div className="h-3 bg-slate-200 rounded w-1/4" />
-                  </div>
-                  <div className="w-16 h-4 bg-slate-200 rounded" />
-                </div>
-              ))}
-            </div>
-          ) : invoices.length === 0 ? (
-            /* Empty State */
-            <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
-              <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-4">
-                <FileText className="w-7 h-7" />
-              </div>
-              <h3 className="text-base font-bold text-slate-900 mb-1">{getEmptyStateText()}</h3>
-              {statusTab === "all" && (
-                <Link
-                  href="/invoices/new"
-                  className={cn(
-                    buttonVariants({ variant: "outline" }),
-                    "mt-4 border-indigo-200 text-indigo-650 hover:bg-indigo-50 font-bold gap-2 rounded-xl"
-                  )}
-                >
-                  <Plus className="w-4 h-4" />
-                  Build Your First Invoice
-                </Link>
-              )}
-            </div>
-          ) : (
-            /* Invoice Grid Table */
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 bg-slate-50/50 text-xs font-bold text-slate-500 tracking-wider">
-                    <th className="px-5 py-4 w-12 text-center">
-                      <input
-                        type="checkbox"
-                        className="rounded border-slate-200 text-indigo-605 focus:ring-indigo-600 bg-white h-3.5 w-3.5"
-                        checked={selectedIds.length === invoices.length}
-                        onChange={handleSelectAll}
-                      />
-                    </th>
-                    <th className="px-5 py-4">Invoice #</th>
-                    <th className="px-5 py-4">Client</th>
-                    <th className="px-5 py-4">Issue Date</th>
-                    <th className="px-5 py-4">Due Date</th>
-                    <th className="px-5 py-4 text-right">Amount</th>
-                    <th className="px-5 py-4 text-center">Status</th>
-                    <th className="px-5 py-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs text-slate-650">
-                  {invoices.map((inv) => {
-                    const daysOver = getDaysOverdue(inv.due_date)
-                    const isOver = (inv.status === "overdue" || (["sent", "viewed"].includes(inv.status) && daysOver > 0))
-                    
-                    return (
-                      <tr key={inv.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-5 py-3.5 text-center">
-                          <input
-                            type="checkbox"
-                            className="rounded border-slate-200 text-indigo-605 focus:ring-indigo-600 bg-white h-3.5 w-3.5"
-                            checked={selectedIds.includes(inv.id)}
-                            onChange={() => handleSelectRow(inv.id)}
-                          />
-                        </td>
-                        <td className="px-5 py-3.5 font-mono font-bold text-indigo-600">
-                          <Link href={`/invoices/${inv.id}`} className="hover:underline">
-                            {inv.invoice_number}
-                          </Link>
-                        </td>
-                        <td className="px-5 py-3.5 font-bold text-slate-900 hover:text-indigo-650 hover:underline">
-                          {inv.client ? (
-                            <Link href={`/clients/${inv.client_id}`}>
-                              {inv.client.name}
-                            </Link>
-                          ) : (
-                            <span className="text-slate-400 italic font-medium">Deleted Client</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5 text-slate-500">{formatDateShort(inv.issue_date)}</td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex flex-col">
-                            <span>{formatDateShort(inv.due_date)}</span>
-                            {isOver && (
-                              <span className="text-[10px] text-rose-600 font-bold mt-0.5 animate-pulse">
-                                {daysOver} {daysOver === 1 ? "day" : "days"} overdue
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5 text-right font-mono font-bold text-slate-900">
-                          {formatCurrency(Number(inv.total) || 0)}
-                        </td>
-                        <td className="px-5 py-3.5 text-center">
-                          <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold border uppercase", getInvoiceStatusColor(inv.status))}>
-                            {inv.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {/* View details */}
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-50 rounded-xl"
-                              onClick={() => router.push(`/invoices/${inv.id}`)}
-                            >
-                              <Eye className="w-4 h-4" />
-                            </Button>
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger className="h-8 w-8 text-slate-500 hover:text-slate-900 hover:bg-slate-50 transition-colors flex items-center justify-center rounded-xl cursor-pointer border border-transparent hover:border-slate-200">
-                                <MoreVertical className="w-4 h-4" />
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent className="bg-white border border-slate-200 text-slate-800 w-36 rounded-xl shadow-lg">
-                                <DropdownMenuItem onClick={() => router.push(`/invoices/${inv.id}`)}>
-                                  <Eye className="w-3.5 h-3.5 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                {inv.status === "draft" && (
-                                  <DropdownMenuItem onClick={() => router.push(`/invoices/new?editId=${inv.id}`)}>
-                                    <Edit3 className="w-3.5 h-3.5 mr-2" />
-                                    Edit Invoice
-                                  </DropdownMenuItem>
-                                )}
-                                {["sent", "viewed", "overdue", "partial"].includes(inv.status) && (
-                                  <DropdownMenuItem onClick={() => handleMarkPaid(inv.id)} className="text-emerald-600 focus:text-emerald-700">
-                                    <CheckCircle className="w-3.5 h-3.5 mr-2" />
-                                    Mark Paid
-                                  </DropdownMenuItem>
-                                )}
-                                {(inv.status === "draft" || inv.status === "cancelled") && (
-                                  <DropdownMenuItem onClick={() => setInvoiceToDelete(inv)} className="text-rose-600 focus:text-rose-700 focus:bg-rose-50">
-                                    <Trash2 className="w-3.5 h-3.5 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-
-        {/* Pagination bar */}
-        {!isLoading && totalPages > 1 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
-            <div>
-              Showing page <span className="font-semibold text-slate-900">{currentPage}</span> of{" "}
-              <span className="font-semibold text-slate-900">{totalPages}</span> ({totalCount} total invoices)
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
-                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="bg-white border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
-
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!invoiceToDelete} onOpenChange={(open) => !open && setInvoiceToDelete(null)}>
-        <DialogContent className="bg-white border-slate-200 text-slate-800 max-w-sm rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-sm rounded-card shadow-floating z-50">
           <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">Delete Invoice?</DialogTitle>
-            <DialogDescription className="text-slate-500 text-sm">
+            <DialogTitle className="text-lg font-bold text-ink-black">Delete Invoice?</DialogTitle>
+            <DialogDescription className="text-ink-secondary text-xs mt-2">
               Are you sure you want to delete invoice <strong>{invoiceToDelete?.invoice_number}</strong>?
               This action will remove all associated line items.
             </DialogDescription>
@@ -590,49 +511,17 @@ export default function InvoicesPage() {
           <DialogFooter className="flex justify-end gap-2.5 pt-4">
             <Button
               variant="outline"
-              className="bg-white border border-slate-200 text-slate-650 hover:bg-slate-50 rounded-xl"
               onClick={() => setInvoiceToDelete(null)}
               disabled={isDeleting}
             >
               Cancel
             </Button>
             <Button
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl"
+              className="bg-danger hover:bg-danger-dark text-white font-bold"
               onClick={handleDeleteInvoice}
               disabled={isDeleting}
             >
-              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4 mr-2" />}
-              Delete Invoice
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bulk Delete Dialog */}
-      <Dialog open={bulkActionType === "delete"} onOpenChange={(open) => !open && setBulkActionType(null)}>
-        <DialogContent className="bg-white border-slate-200 text-slate-800 max-w-sm rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)]">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">Bulk Delete Invoices?</DialogTitle>
-            <DialogDescription className="text-slate-500 text-sm">
-              Are you sure you want to delete <span className="font-bold text-slate-900">{selectedIds.length}</span> selected invoices?
-              Only drafts and cancelled invoices can be deleted. This action is permanent.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex justify-end gap-2.5 pt-4">
-            <Button
-              variant="outline"
-              className="bg-white border-slate-200 text-slate-650 hover:bg-slate-50 rounded-xl"
-              onClick={() => setBulkActionType(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl"
-              onClick={handleBulkAction}
-              disabled={isBulkProcessing}
-            >
-              {isBulkProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Confirm Delete
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete Invoice"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { invoiceSchema } from "@/lib/validations/invoice"
 
 export async function POST(request: NextRequest) {
@@ -181,6 +182,151 @@ export async function POST(request: NextRequest) {
       description: `Invoice "${invoice_number}" created for amount: ₹${total.toLocaleString("en-IN")}.`,
       metadata: { invoice_id: invoice.id },
     })
+
+    // 5. Generate Razorpay Payment Link & Auto-Dispatch
+    try {
+      const { data: fullInvoice } = await supabase
+        .from("invoices")
+        .select(`
+          *,
+          client:clients(*),
+          business:businesses(*)
+        `)
+        .eq("id", invoice.id)
+        .single()
+
+      if (fullInvoice && fullInvoice.client) {
+        const paymentDetails = {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice_number,
+          amount: Number(total),
+          clientName: fullInvoice.client.name,
+          clientEmail: fullInvoice.client.email || "",
+          clientPhone: fullInvoice.client.phone || "",
+          businessName: fullInvoice.business.name,
+          businessId: fullInvoice.business.id,
+          dueDate: due_date,
+        }
+
+        const { createPaymentLink } = await import("@/lib/razorpay/createPaymentLink")
+        const paymentLinkData = await createPaymentLink(paymentDetails)
+
+        if (paymentLinkData) {
+          const paymentLinkUrl = paymentLinkData.url
+          const paymentLinkId = paymentLinkData.id
+
+          // Update status to sent with the payment link
+          await supabase
+            .from("invoices")
+            .update({
+              payment_link: paymentLinkUrl,
+              payment_link_id: paymentLinkId,
+              status: "sent",
+              sent_at: new Date().toISOString(),
+            })
+            .eq("id", invoice.id)
+          
+          invoice.payment_link = paymentLinkUrl
+          invoice.payment_link_id = paymentLinkId
+          invoice.status = "sent"
+          invoice.sent_at = new Date().toISOString()
+
+          // 6. Non-blocking Background PDF Generation & Email Dispatch
+          const triggerBackgroundDispatch = async () => {
+            try {
+              const bgSupabase = getSupabaseServiceRoleClient()
+              const { data: invoiceWithItems } = await bgSupabase
+                .from("invoices")
+                .select(`
+                  *,
+                  client:clients(*),
+                  items:invoice_items(*),
+                  business:businesses(*)
+                `)
+                .eq("id", invoice.id)
+                .single()
+
+              if (!invoiceWithItems) return
+
+              // Render PDF
+              const { renderToBuffer } = await import("@react-pdf/renderer")
+              const React = await import("react")
+              const InvoiceDocument = (await import("@/lib/pdf/InvoiceDocument")).default
+
+              const pdfBuffer = await renderToBuffer(
+                React.createElement(InvoiceDocument, {
+                  invoice: invoiceWithItems,
+                  client: invoiceWithItems.client,
+                  items: invoiceWithItems.items,
+                  business: invoiceWithItems.business,
+                }) as any
+              )
+
+              const fileName = `invoices/${invoiceWithItems.business.id}/${invoiceWithItems.id}.pdf`
+              const { error: uploadError } = await bgSupabase.storage
+                .from("invoices")
+                .upload(fileName, pdfBuffer, {
+                  contentType: "application/pdf",
+                  upsert: true,
+                })
+
+              let pdfPublicUrl = ""
+              if (!uploadError) {
+                const { data: { publicUrl } } = bgSupabase.storage
+                  .from("invoices")
+                  .getPublicUrl(fileName)
+                
+                await bgSupabase
+                  .from("invoices")
+                  .update({ pdf_url: publicUrl })
+                  .eq("id", invoice.id)
+
+                pdfPublicUrl = publicUrl
+              }
+
+              // Send email if client email exists
+              if (invoiceWithItems.client.email) {
+                const { sendInvoiceEmail } = await import("@/lib/email/send")
+                const formattedAmount = `₹${Number(invoiceWithItems.total).toLocaleString("en-IN")}`
+                
+                await sendInvoiceEmail({
+                  to: invoiceWithItems.client.email,
+                  businessName: invoiceWithItems.business.name,
+                  businessLogo: invoiceWithItems.business.logo_url,
+                  clientName: invoiceWithItems.client.name,
+                  invoiceNumber: invoiceWithItems.invoice_number,
+                  amount: formattedAmount,
+                  dueDate: invoiceWithItems.due_date,
+                  paymentLink: paymentLinkUrl,
+                  items: invoiceWithItems.items.map((item: any) => ({
+                    description: item.description,
+                    amount: `₹${Number(item.amount).toLocaleString("en-IN")}`,
+                  })),
+                  businessPhone: invoiceWithItems.business.phone || "",
+                  businessEmail: invoiceWithItems.business.email || "",
+                  pdfUrl: pdfPublicUrl || null,
+                })
+
+                await bgSupabase.from("reminder_logs").insert({
+                  invoice_id: invoice.id,
+                  business_id: invoiceWithItems.business.id,
+                  reminder_type: "invoice_sent",
+                  channel: "email",
+                  status: "sent",
+                  message_content: `Invoice automatically emailed to ${invoiceWithItems.client.email}`,
+                })
+              }
+            } catch (bgErr) {
+              console.error("Background invoice dispatch failed:", bgErr)
+            }
+          }
+
+          triggerBackgroundDispatch().catch(e => console.error("Auto-dispatch runner failed:", e))
+        }
+      }
+    } catch (autoSendErr) {
+      console.error("Auto-send links setup failed:", autoSendErr)
+    }
 
     return NextResponse.json({
       ...invoice,

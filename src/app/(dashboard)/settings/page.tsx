@@ -7,7 +7,6 @@ import {
   CreditCard, 
   Bell, 
   Users, 
-  ShieldCheck, 
   Save, 
   Plus, 
   Trash2, 
@@ -17,16 +16,18 @@ import {
   Sparkles, 
   Loader2, 
   AlertTriangle,
-  Play,
-  Pause,
-  Clock,
   Mail,
   MessageSquare,
   CheckCircle2,
-  Lock
+  Lock,
+  Check
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatCurrency, formatDate, cn } from "@/lib/utils"
+import StatCard from "@/components/shared/StatCard"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface BusinessProfile {
   id: string
@@ -99,7 +100,7 @@ const INDIAN_STATES = [
 ]
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "team">("profile")
+  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "team" | "plans">("profile")
   
   // Data States
   const [business, setBusiness] = React.useState<BusinessProfile | null>(null)
@@ -124,25 +125,13 @@ export default function SettingsPage() {
     async function loadAllSettings() {
       try {
         setIsLoading(true)
-        const [bizRes, notifRes, teamRes, subRes] = await Promise.all([
+        const [bizRes, notifRes, teamRes] = await Promise.all([
           fetch("/api/settings/business"),
           fetch("/api/settings"),
           fetch("/api/settings/team"),
-          // Fetch subscription mock or actual status
-          fetch("/api/settings/business").then(async (r) => {
-            const biz = await r.json()
-            // We retrieve subscription or return fallback
-            const res = await fetch(`/api/settings`) // Fetch subscription
-            return {
-              plan: "free",
-              billing_cycle: "monthly",
-              status: "active",
-              current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
-            } as SubscriptionDetails
-          })
         ])
 
-        if (!bizRes.ok || !notifRes.ok) throw new Error("Could not retrieve some configurations.")
+        if (!bizRes.ok || !notifRes.ok) throw new Error("Could not retrieve configurations.")
 
         const bizData = await bizRes.json()
         const notifData = await notifRes.json()
@@ -166,12 +155,16 @@ export default function SettingsPage() {
           quiet_hours_end: notifData.quiet_hours_end?.slice(0, 5) || "20:00",
         })
         setTeam(teamData)
-        setSubscription({
-          plan: "free",
-          billing_cycle: "monthly",
-          status: "active",
-          current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
-        })
+        if (bizData.subscription) {
+          setSubscription(bizData.subscription)
+        } else {
+          setSubscription({
+            plan: "free",
+            billing_cycle: "monthly",
+            status: "active",
+            current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+          })
+        }
       } catch (err: any) {
         toast.error(err.message || "Failed to load preferences.")
       } finally {
@@ -181,7 +174,7 @@ export default function SettingsPage() {
     loadAllSettings()
   }, [])
 
-  // Save profile and defaults (Tabs 1, 2, 3)
+  // Save profile and defaults
   const saveBusinessProfile = async () => {
     if (!business) return
     setIsSaving(true)
@@ -205,7 +198,37 @@ export default function SettingsPage() {
     }
   }
 
-  // Save notifications (Tab 4)
+  const handleUpgradePlan = async (planName: string) => {
+    setIsSaving(true)
+    const toastId = toast.loading(`Initiating secure checkout for ${planName} Plan...`)
+    try {
+      const res = await fetch("/api/settings/subscription/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planName }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Upgrade failed")
+      
+      toast.success(`Success! Workspace plan upgraded to ${planName.toUpperCase()}.`)
+      
+      const bizRes = await fetch("/api/settings/business")
+      if (bizRes.ok) {
+        const bizData = await bizRes.json()
+        setBusiness(bizData)
+        if (bizData.subscription) {
+          setSubscription(bizData.subscription)
+        }
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to upgrade subscription plan.")
+    } finally {
+      toast.dismiss(toastId)
+      setIsSaving(false)
+    }
+  }
+
+  // Save notifications
   const saveNotifications = async () => {
     if (!notifications) return
     setIsSaving(true)
@@ -261,7 +284,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Invite Team Member
   const handleInviteTeamMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!inviteEmail) return
@@ -287,7 +309,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Remove Team Member
   const handleRemoveTeamMember = async (id: string, email: string) => {
     if (!confirm(`Are you sure you want to remove ${email} from the team?`)) return
     const toastId = toast.loading("Removing team member...")
@@ -308,7 +329,6 @@ export default function SettingsPage() {
     }
   }
 
-  // Previews mapping for Tab 4
   const previews = {
     sent: {
       wa: "Hi Client,\n\nYou have a new invoice from My Business.\n\n📄 Invoice: INV-001\n💰 Amount: ₹10,000\n📅 Due Date: 2026-07-20\n\nPay securely here:\nhttps://collectbot.in/pay/inv_id\n\nThank you!",
@@ -342,66 +362,87 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-[50vh] flex flex-col items-center justify-center text-slate-850 animate-pulse">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mb-4" />
-        <p className="text-slate-500 text-sm">Loading your settings dashboard...</p>
+      <div className="min-h-[50vh] flex flex-col items-center justify-center text-ink-secondary animate-pulse max-w-6xl mx-auto">
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
+        <p className="text-xs font-semibold">Loading system settings...</p>
       </div>
     )
   }
 
   if (!business || !notifications) return null
 
+  const hasMissingUPI = !business.upi_id
+
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10 select-none text-slate-800">
+    <div className="space-y-6 max-w-6xl mx-auto pb-10 select-none text-ink-primary">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-border/50 pb-5">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">System Settings</h1>
-          <p className="text-slate-500 text-xs mt-1">Manage business metadata, custom invoice layouts, payments settings, and system billing.</p>
+          <h1 className="text-3xl font-extrabold tracking-tight text-ink-black leading-tight">Settings</h1>
+          <p className="text-ink-secondary text-sm">Manage business profile metadata, invoices counter, and UPI payment options.</p>
         </div>
-        {activeTab !== "notifications" && activeTab !== "team" && (
+        {activeTab !== "notifications" && activeTab !== "team" && activeTab !== "plans" ? (
           <button
             onClick={saveBusinessProfile}
             disabled={isSaving}
-            className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+            className="btn-primary px-4 py-2.5 rounded-button text-xs font-bold gap-2"
           >
             <Save className="w-4 h-4" />
-            Save tab changes
+            Save Changes
           </button>
-        )}
-        {activeTab === "notifications" && (
+        ) : activeTab === "plans" ? (
+          <div className="w-10 h-10 flex items-center justify-center bg-cream-100 rounded-full">
+            <Sparkles className="w-5 h-5 text-[#E91E63]" />
+          </div>
+        ) : (
           <button
             onClick={saveNotifications}
             disabled={isSaving}
-            className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer"
+            className="btn-primary px-4 py-2.5 rounded-button text-xs font-bold gap-2"
           >
             <Save className="w-4 h-4" />
-            Save Alerts
+            Save Preferences
           </button>
         )}
       </div>
 
-      {/* Tabs Layout */}
+      {/* Onboarding Missing UPI Banner */}
+      {hasMissingUPI && (
+        <div className="p-4 rounded-card bg-danger-light border border-danger/20 text-danger-dark flex items-center gap-3">
+          <AlertTriangle className="w-5 h-5 shrink-0 text-danger" />
+          <div>
+            <p className="text-xs font-extrabold uppercase tracking-wider">No active UPI ID Configured</p>
+            <p className="text-[11px] font-semibold mt-0.5 leading-relaxed">
+              Your UPI ID is empty. Invoices will default to draft-only mode and sending actions will block until a destination UPI handle is saved.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
         {/* Navigation Sidebar */}
-        <div className="lg:col-span-3 bg-white border border-slate-200 rounded-2xl p-3 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-1">
+        <div className="lg:col-span-3 bg-surface-white border border-surface-border/50 rounded-card p-3 shadow-card space-y-1">
           {[
             { id: "profile", label: "Business Profile", icon: Building2 },
             { id: "invoice", label: "Invoice Settings", icon: FileText },
-            { id: "payment", label: "Payment Settings", icon: CreditCard },
-            { id: "notifications", label: "Notifications", icon: Bell },
+            { id: "payment", label: "Payment & Banking", icon: CreditCard },
+            { id: "notifications", label: "Alert Schedules", icon: Bell },
             { id: "team", label: "Team Members", icon: Users },
+            { id: "plans", label: "Pricing & Plans", icon: Sparkles },
           ].map((tab) => {
             const Icon = tab.icon
+            const isActive = activeTab === tab.id
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer",
-                  activeTab === tab.id
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                  "w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer border-none",
+                  isActive
+                    ? "bg-dark text-white shadow-soft"
+                    : "text-ink-secondary hover:text-ink-primary hover:bg-cream-50"
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -411,703 +452,509 @@ export default function SettingsPage() {
           })}
         </div>
 
-        {/* Dynamic Panels */}
+        {/* Form panel content */}
         <div className="lg:col-span-9 space-y-6">
 
           {/* TAB 1: BUSINESS PROFILE */}
           {activeTab === "profile" && (
             <div className="space-y-6">
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Basic Information</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Business Name</label>
-                    <input
-                      type="text"
-                      value={business.name}
-                      onChange={(e) => setBusiness({ ...business, name: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    />
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Basic Information</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Business Name</Label>
+                      <input
+                        type="text"
+                        value={business.name}
+                        onChange={(e) => setBusiness({ ...business, name: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Business Email</Label>
+                      <input
+                        type="email"
+                        value={business.email || ""}
+                        onChange={(e) => setBusiness({ ...business, email: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Business Phone</Label>
+                      <input
+                        type="text"
+                        value={business.phone || ""}
+                        onChange={(e) => setBusiness({ ...business, phone: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">VAT/GSTIN Identifier</Label>
+                      <input
+                        type="text"
+                        value={business.gstin || ""}
+                        placeholder="GSTIN Number (Optional)"
+                        onChange={(e) => setBusiness({ ...business, gstin: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Business Email</label>
-                    <input
-                      type="email"
-                      value={business.email || ""}
-                      onChange={(e) => setBusiness({ ...business, email: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Business Phone</label>
-                    <input
-                      type="text"
-                      value={business.phone || ""}
-                      onChange={(e) => setBusiness({ ...business, phone: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">WhatsApp Dispatch Phone</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. +91XXXXXXXXXX"
-                      value={business.whatsapp_number || ""}
-                      onChange={(e) => setBusiness({ ...business, whatsapp_number: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    />
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Address */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Address details</h3>
-                <div className="space-y-4">
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Office Location</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Full Address</label>
+                    <Label className="text-[10px] uppercase font-bold text-ink-secondary">Street Address</Label>
                     <input
                       type="text"
                       value={business.address || ""}
                       onChange={(e) => setBusiness({ ...business, address: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                     />
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-slate-500">City</label>
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">City</Label>
                       <input
                         type="text"
                         value={business.city || ""}
                         onChange={(e) => setBusiness({ ...business, city: e.target.value })}
-                        className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-slate-500">State</label>
-                      <select
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">State</Label>
+                      <Select
                         value={business.state || ""}
-                        onChange={(e) => setBusiness({ ...business, state: e.target.value })}
-                        className="w-full bg-white border border-slate-205 rounded-xl h-9 px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                        onValueChange={(val) => setBusiness({ ...business, state: val })}
                       >
-                        <option value="">Select State</option>
-                        {INDIAN_STATES.map(s => <option key={s} value={s}>{s}</option>)}
-                      </select>
+                        <SelectTrigger className="w-full bg-cream-50 text-ink-primary h-11 border-none shadow-soft rounded-button px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-500/20 transition-all justify-between">
+                          <SelectValue placeholder="Select State" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-surface-border rounded-xl shadow-floating max-h-56 z-50">
+                          {INDIAN_STATES.map((st) => (
+                            <SelectItem key={st} value={st} className="cursor-pointer text-xs py-1.5">
+                              {st}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-slate-500">Pincode</label>
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Pincode</Label>
                       <input
                         type="text"
                         value={business.pincode || ""}
                         onChange={(e) => setBusiness({ ...business, pincode: e.target.value })}
-                        className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
                       />
                     </div>
                   </div>
-                </div>
-              </div>
-
-              {/* Legal info & GSTIN */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Legal & Tax info</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">GSTIN (15 characters)</label>
-                    <input
-                      type="text"
-                      maxLength={15}
-                      placeholder="e.g. 27AAAAA1111A1Z1"
-                      value={business.gstin || ""}
-                      onChange={(e) => setBusiness({ ...business, gstin: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
-                    {business.gstin && business.gstin.length !== 15 && (
-                      <span className="text-[10px] text-rose-600 block font-semibold">Must be exactly 15 characters.</span>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">PAN Number</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. ABCDE1234F"
-                      value={business.pan || ""}
-                      onChange={(e) => setBusiness({ ...business, pan: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Business logo upload */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Invoice Logo</h3>
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <div className="w-24 h-24 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-center overflow-hidden">
-                    {business.logo_url ? (
-                      <img src={business.logo_url} alt="Logo" className="w-full h-full object-contain" />
-                    ) : (
-                      <Building2 className="w-8 h-8 text-slate-400" />
-                    )}
-                  </div>
-                  <div className="space-y-2">
-                    <span className="text-xs font-bold block text-slate-700">Upload business logo</span>
-                    <span className="text-[10px] text-slate-450 block">PNG, JPG, SVG allowed. Maximum size: 2MB.</span>
-                    <label className="inline-flex items-center gap-1.5 bg-slate-150 hover:bg-slate-200 text-slate-750 text-xs font-bold px-3.5 py-1.5 rounded-xl cursor-pointer transition-all border border-slate-200 shadow-sm">
-                      <Upload className="w-3.5 h-3.5 text-slate-600" />
-                      Upload File
-                      <input
-                        type="file"
-                        accept="image/png, image/jpeg, image/svg+xml"
-                        className="hidden"
-                        onChange={handleLogoUpload}
-                        disabled={isUploadingLogo}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* TAB 2: INVOICE SETTINGS */}
+          {/* TAB 2: INVOICE CONFIGURATION */}
           {activeTab === "invoice" && (
             <div className="space-y-6">
-              {/* Numbering Prefix */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Invoice Numbering</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Invoice Prefix (Max 5 chars)</label>
-                    <input
-                      type="text"
-                      maxLength={5}
-                      value={business.invoice_prefix}
-                      onChange={(e) => setBusiness({ ...business, invoice_prefix: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Next Invoice Serial Number</label>
-                    <input
-                      type="number"
-                      value={business.invoice_counter}
-                      onChange={(e) => setBusiness({ ...business, invoice_counter: Number(e.target.value) })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col justify-center text-center">
-                    <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider block">Preview Serial</span>
-                    <span className="text-xs font-mono font-bold text-indigo-700 mt-1">
-                      {business.invoice_prefix}-{new Date().getFullYear()}-{String(business.invoice_counter).padStart(3, "0")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Invoice Layout & Styling */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-5">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Invoice Layout & Customization</h3>
-                
-                <div className="space-y-4">
-                  {/* Select template design */}
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 block">Template Design</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      {[
-                        { id: "modern", title: "Modern Design", desc: "Clean blue accent header and shaded totals." },
-                        { id: "classic", title: "Classic Traditional", desc: "Traditional dark header outline table borders." },
-                        { id: "minimal", title: "Minimalist Clean", desc: "Zero background grids with spacing styles." },
-                      ].map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() => setBusiness({ ...business, invoice_template: t.id })}
-                          className={cn(
-                            "p-3 rounded-xl border text-left space-y-1.5 transition-all bg-slate-50/50 cursor-pointer",
-                            business.invoice_template === t.id
-                              ? "border-indigo-600 ring-2 ring-indigo-50 bg-indigo-50/30 text-indigo-900"
-                              : "border-slate-200 hover:border-slate-350 hover:bg-slate-50"
-                          )}
-                        >
-                          <span className="text-xs font-bold block">{t.title}</span>
-                          <span className="text-[10px] text-slate-500 leading-normal block font-medium">{t.desc}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Preset Colors */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase font-bold text-slate-500 block">Primary Accent Color</label>
-                      <div className="flex gap-2.5">
-                        {[
-                          { id: "blue", hex: "bg-blue-600" },
-                          { id: "green", hex: "bg-emerald-600" },
-                          { id: "purple", hex: "bg-indigo-600" },
-                          { id: "orange", hex: "bg-amber-600" },
-                          { id: "black", hex: "bg-slate-900 border border-slate-700" },
-                        ].map((c) => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => setBusiness({ ...business, primary_color: c.id })}
-                            className={cn(
-                              "w-6 h-6 rounded-full transition-all flex items-center justify-center cursor-pointer",
-                              c.hex,
-                              business.primary_color === c.id ? "ring-2 ring-indigo-600 ring-offset-2 ring-offset-white" : "hover:scale-110"
-                            )}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Font Type */}
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Sequence Counters</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-slate-500 block">Font Family</label>
-                      <div className="flex gap-2">
-                        {["Inter", "Roboto"].map((f) => (
-                          <button
-                            key={f}
-                            type="button"
-                            onClick={() => setBusiness({ ...business, font_family: f })}
-                            className={cn(
-                              "px-3 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer",
-                              business.font_family === f
-                                ? "border-indigo-600 bg-indigo-50 text-indigo-700 font-bold"
-                                : "border-slate-205 text-slate-500 hover:border-slate-350"
-                            )}
-                          >
-                            {f}
-                          </button>
-                        ))}
-                      </div>
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Invoice Number Prefix</Label>
+                      <input
+                        type="text"
+                        value={business.invoice_prefix}
+                        onChange={(e) => setBusiness({ ...business, invoice_prefix: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Next Sequence Number</Label>
+                      <input
+                        type="number"
+                        value={business.invoice_counter}
+                        onChange={(e) => setBusiness({ ...business, invoice_counter: parseInt(e.target.value) || 1 })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
                     </div>
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Default Terms, Terms & Conditions textareas */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Default Note templates</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Default Notes (every invoice)</label>
-                    <textarea
-                      rows={4}
-                      value={business.default_notes || ""}
-                      onChange={(e) => setBusiness({ ...business, default_notes: e.target.value })}
-                      placeholder="e.g. Thanks for your business!"
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    />
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Default Invoice Terms</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Default Terms (Days)</Label>
+                      <input
+                        type="number"
+                        value={business.default_payment_terms}
+                        onChange={(e) => setBusiness({ ...business, default_payment_terms: parseInt(e.target.value) || 7 })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Default GST Rate %</Label>
+                      <input
+                        type="number"
+                        value={business.default_tax_rate}
+                        onChange={(e) => setBusiness({ ...business, default_tax_rate: parseFloat(e.target.value) || 18 })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
+                    </div>
                   </div>
+                  
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Default Terms (invoice bottom)</label>
+                    <Label className="text-[10px] uppercase font-bold text-ink-secondary">Default Terms visible on bills</Label>
                     <textarea
-                      rows={4}
                       value={business.default_terms || ""}
                       onChange={(e) => setBusiness({ ...business, default_terms: e.target.value })}
-                      placeholder="e.g. Late fee interest rate: 18% per annum."
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none min-h-[80px]"
                     />
                   </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* TAB 3: PAYMENT SETTINGS */}
+          {/* TAB 3: PAYMENT & BANKING CONFIGURATION */}
           {activeTab === "payment" && (
             <div className="space-y-6">
-              {/* UPI */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">UPI ID (Instants in India)</h3>
-                <div className="space-y-4">
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">UPI Configuration</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">UPI ID</label>
+                    <div className="flex justify-between items-baseline">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">UPI ID handle *</Label>
+                      {hasMissingUPI && <span className="text-[9px] text-danger font-extrabold animate-pulse">Required</span>}
+                    </div>
                     <input
                       type="text"
-                      placeholder="e.g. business@ybl, name@okhdfcbank"
+                      placeholder="e.g. businessname@okaxis"
                       value={business.upi_id || ""}
                       onChange={(e) => setBusiness({ ...business, upi_id: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
+                      className={cn(
+                        "w-full rounded-button px-4 py-3 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono",
+                        hasMissingUPI ? "bg-danger-light text-danger-dark placeholder:text-danger/40" : "bg-cream-50 text-ink-primary"
+                      )}
                     />
+                    <p className="text-[10px] text-ink-secondary italic leading-relaxed">
+                      This UPI handle is used to generate QR codes and link checkouts directly to your bank account.
+                    </p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center justify-between gap-4">
-                    <span className="text-[10px] text-slate-500 font-bold">Auto-compatible Apps:</span>
-                    <span className="text-xs font-bold text-indigo-700">BHIM, Google Pay, PhonePe, Paytm</span>
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
 
-              {/* Bank Transfer Details */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Direct Bank Transfer</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Banking Details</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
                   <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Bank Name</label>
+                    <Label className="text-[10px] uppercase font-bold text-ink-secondary">Bank Name</Label>
                     <input
                       type="text"
+                      placeholder="e.g. HDFC Bank"
                       value={business.bank_name || ""}
                       onChange={(e) => setBusiness({ ...business, bank_name: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">IFSC Code</label>
-                    <input
-                      type="text"
-                      value={business.ifsc_code || ""}
-                      onChange={(e) => setBusiness({ ...business, ifsc_code: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">Account Number</Label>
+                      <input
+                        type={showAccountNumber ? "text" : "password"}
+                        placeholder="Bank Account Number"
+                        value={business.account_number || ""}
+                        onChange={(e) => setBusiness({ ...business, account_number: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] uppercase font-bold text-ink-secondary">IFSC Code</Label>
+                      <input
+                        type="text"
+                        placeholder="HDFC0000240"
+                        value={business.ifsc_code || ""}
+                        onChange={(e) => setBusiness({ ...business, ifsc_code: e.target.value })}
+                        className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 flex items-center justify-between">
-                      <span>Account Number</span>
-                      <button
-                        type="button"
-                        onClick={() => setShowAccountNumber(!showAccountNumber)}
-                        className="text-[9px] text-indigo-600 hover:text-indigo-800 border-0 bg-transparent font-bold capitalize flex items-center gap-0.5 cursor-pointer"
-                      >
-                        {showAccountNumber ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                        {showAccountNumber ? "Hide" : "Show"}
-                      </button>
-                    </label>
-                    <input
-                      type={showAccountNumber ? "text" : "password"}
-                      value={business.account_number || ""}
-                      onChange={(e) => setBusiness({ ...business, account_number: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Currency</label>
-                    <select
-                      value={business.currency}
-                      onChange={(e) => setBusiness({ ...business, currency: e.target.value })}
-                      className="w-full bg-white border border-slate-205 rounded-xl h-9 px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                    >
-                      <option value="INR">INR (₹)</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* Razorpay Setup */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 flex items-center justify-between text-slate-900">
-                  <span>Razorpay Integration Gateway</span>
-                  <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-xl border bg-emerald-50 text-emerald-700 border-emerald-250">
-                    Connected
-                  </span>
-                </h3>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-center space-y-1">
-                  <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">Credential Key ID (Active)</span>
-                  <span className="text-xs font-mono font-bold text-slate-700">rzp_test_...XXXX</span>
-                  <span className="text-[9px] text-slate-450 mt-2 block font-medium">To reconnect or change credentials, check your `.env.local` config files.</span>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
-          {/* TAB 4: NOTIFICATIONS */}
+          {/* TAB 4: ALERT SCHEDULES */}
           {activeTab === "notifications" && (
             <div className="space-y-6">
-              {/* Channels Selection */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4 text-slate-800">
-                <h3 className="text-sm font-bold flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
-                  <MessageSquare className="w-4 h-4 text-indigo-650" />
-                  Notification Channels
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold block text-slate-400 line-through">WhatsApp Notifications</span>
-                      <span className="text-[10px] text-amber-700 font-bold flex items-center gap-1">
-                        <Lock className="w-2.5 h-2.5" /> Deactivated (Email Only Mode)
-                      </span>
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Notification Channels</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex items-center justify-between p-3.5 bg-cream-50 rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-ink-black">WhatsApp Reminders</p>
+                      <p className="text-[10px] text-ink-secondary">Send automated WhatsApp notifications directly.</p>
                     </div>
-                    <label className="relative inline-flex items-center cursor-not-allowed opacity-50">
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        disabled
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 border border-slate-300 peer-focus:outline-none rounded-full peer after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold block text-slate-700">Email Notifications</span>
-                      <span className="text-[10px] text-slate-500 font-medium">Send custom designs via Resend</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notifications.channel_email}
-                        onChange={() => setNotifications({ ...notifications, channel_email: !notifications.channel_email })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 border border-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Schedule Configuration */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4 text-slate-800">
-                <h3 className="text-sm font-bold flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
-                  <Bell className="w-4 h-4 text-indigo-650" />
-                  Automated Reminders Schedule
-                </h3>
-                <div className="space-y-3 pt-1">
-                  {[
-                    { key: "reminder_7_before", label: "7 Days Before Due Date", desc: "First soft reminder to prepare client." },
-                    { key: "reminder_3_before", label: "3 Days Before Due Date", desc: "Follow up notification as the due date gets closer." },
-                    { key: "reminder_1_before", label: "1 Day Before Due Date", desc: "High-priority nudge indicating payment is due tomorrow." },
-                    { key: "reminder_due_day", label: "On Due Date", desc: "Alert dispatched on morning of the exact due date." },
-                    { key: "reminder_1_after", label: "1 Day After Due Date", desc: "First overdue notification and status color shifts." },
-                    { key: "reminder_3_after", label: "3 Days After Due Date", desc: "Mild warning indicating payment latency." },
-                    { key: "reminder_7_after", label: "7 Days After Due Date", desc: "Escalated warning prompting direct action." },
-                    { key: "reminder_14_after", label: "14 Days After Due Date", desc: "Final notice with automated owner follow-up alert." },
-                  ].map((item) => (
-                    <div key={item.key} className="flex items-center justify-between p-2.5 bg-slate-50/30 rounded-xl hover:bg-slate-50 border border-slate-100">
-                      <div className="space-y-0.5">
-                        <span className="text-xs font-bold block text-slate-800">{item.label}</span>
-                        <span className="text-[10px] text-slate-500 font-medium">{item.desc}</span>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={notifications[item.key as keyof NotificationSettings] as boolean}
-                          onChange={() => setNotifications({ ...notifications, [item.key]: !notifications[item.key as keyof NotificationSettings] })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-9 h-5 bg-slate-200 border border-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Quiet Hours */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4 text-slate-800">
-                <h3 className="text-sm font-bold flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
-                  <Clock className="w-4 h-4 text-indigo-650" />
-                  Time Constraints (Quiet Hours)
-                </h3>
-                <p className="text-[10px] text-slate-500 leading-relaxed font-medium">
-                  Auto-reminders are restricted to this window. If a cron trigger fires outside these hours, the notification is skipped.
-                </p>
-                <div className="flex items-center gap-4 pt-1">
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">Start sending at</span>
                     <input
-                      type="time"
-                      value={notifications.quiet_hours_start}
-                      onChange={(e) => setNotifications({ ...notifications, quiet_hours_start: e.target.value })}
-                      className="w-full bg-white border border-slate-200 text-slate-900 text-xs h-9 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
+                      type="checkbox"
+                      checked={notifications.channel_whatsapp}
+                      onChange={(e) => setNotifications({ ...notifications, channel_whatsapp: e.target.checked })}
+                      className="rounded border-surface-border text-brand-600 focus:ring-brand-500 h-4 w-4 bg-white"
                     />
                   </div>
-                  <div className="flex-1 space-y-1.5">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase tracking-wider">Stop sending at</span>
+
+                  <div className="flex items-center justify-between p-3.5 bg-cream-50 rounded-xl">
+                    <div>
+                      <p className="text-xs font-bold text-ink-black">Email Reminders</p>
+                      <p className="text-[10px] text-ink-secondary">Dispatch automated email notifications to clients.</p>
+                    </div>
                     <input
-                      type="time"
-                      value={notifications.quiet_hours_end}
-                      onChange={(e) => setNotifications({ ...notifications, quiet_hours_end: e.target.value })}
-                      className="w-full bg-white border border-slate-200 text-slate-900 text-xs h-9 px-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350 font-mono"
+                      type="checkbox"
+                      checked={notifications.channel_email}
+                      onChange={(e) => setNotifications({ ...notifications, channel_email: e.target.checked })}
+                      className="rounded border-surface-border text-brand-600 focus:ring-brand-500 h-4 w-4 bg-white"
                     />
                   </div>
-                </div>
-              </div>
-
-              {/* Owner Alerts */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4 text-slate-800">
-                <h3 className="text-sm font-bold flex items-center gap-2 border-b border-slate-100 pb-3 text-slate-900">
-                  <CheckCircle2 className="w-4 h-4 text-indigo-650" />
-                  Owner Status Alerts
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold block text-slate-800">Payment Alerts</span>
-                      <span className="text-[10px] text-slate-505 font-medium">Instant notification when paid</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notifications.owner_payment_alert}
-                        onChange={() => setNotifications({ ...notifications, owner_payment_alert: !notifications.owner_payment_alert })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 border border-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-between p-3 bg-slate-50/80 rounded-xl border border-slate-200">
-                    <div className="space-y-0.5">
-                      <span className="text-xs font-bold block text-slate-800">Daily Collection Summary</span>
-                      <span className="text-[10px] text-slate-505 font-medium">Report sent at 7:00 PM IST</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={notifications.owner_daily_summary}
-                        onChange={() => setNotifications({ ...notifications, owner_daily_summary: !notifications.owner_daily_summary })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-9 h-5 bg-slate-200 border border-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-indigo-600 peer-checked:after:bg-white"></div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Previews */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4 text-slate-800">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-indigo-650" />
-                    Message Template Previews
-                  </h3>
-                  <p className="text-[10px] text-slate-500 mt-0.5 font-medium">Click a milestone type to review email message formatting.</p>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 border-b border-slate-100 pb-3">
-                  {[
-                    { id: "sent", label: "Invoice Sent" },
-                    { id: "friendly", label: "Friendly Rem." },
-                    { id: "nudge", label: "1 Day Nudge" },
-                    { id: "due", label: "Due Today" },
-                    { id: "overdue", label: "Overdue 3d" },
-                    { id: "final", label: "Final Alert" },
-                    { id: "thanks", label: "Thank You" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActivePreview(tab.id as any)}
-                      className={`text-[9px] font-bold px-2.5 py-1.5 rounded-xl border transition-all cursor-pointer ${
-                        activePreview === tab.id
-                          ? "bg-indigo-600 text-white border-indigo-600"
-                          : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-2">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
-                    <Mail className="w-3.5 h-3.5 text-sky-500" /> Email Subject Line Preview
-                  </span>
-                  <div className="bg-slate-50 px-3 py-2.5 rounded-xl border border-slate-200 font-mono text-[11px] text-slate-700">
-                    {previews[activePreview].emailSubject}
-                  </div>
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
           )}
 
           {/* TAB 5: TEAM MEMBERS */}
           {activeTab === "team" && (
             <div className="space-y-6">
-              {/* Roster Listing */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Current Team Members</h3>
-                <div className="overflow-x-auto border border-slate-200 rounded-xl">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 text-[10px] text-slate-500 font-bold border-b border-slate-100">
-                        <th className="p-3">Email Address</th>
-                        <th className="p-3">Role</th>
-                        <th className="p-3">Status</th>
-                        <th className="p-3 text-center">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      <tr className="hover:bg-slate-50/50">
-                        <td className="p-3 font-semibold text-slate-900">owner@collectbot.in (You)</td>
-                        <td className="p-3 font-mono text-[10px] uppercase text-indigo-700 font-bold">Owner</td>
-                        <td className="p-3">
-                          <span className="text-[10px] text-emerald-700 font-bold">Active</span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <span className="text-slate-400 text-[10px]">-</span>
-                        </td>
-                      </tr>
-                      {team.map((member) => (
-                        <tr key={member.id} className="hover:bg-slate-50/50">
-                          <td className="p-3 font-medium">{member.email}</td>
-                          <td className="p-3 font-mono text-[10px] uppercase text-slate-500">{member.role}</td>
-                          <td className="p-3">
-                            <span className={cn(
-                              "text-[10px] font-bold",
-                              member.status === "active" ? "text-emerald-700" : "text-amber-700"
-                            )}>
-                              {member.status === "active" ? "Active" : "Pending Invite"}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTeamMember(member.id, member.email)}
-                              className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Invite Member form */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.01)] space-y-4">
-                <h3 className="text-sm font-bold border-b border-slate-100 pb-3 text-slate-900">Invite Team Member</h3>
-                <form onSubmit={handleInviteTeamMember} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                  <div className="space-y-1.5 sm:col-span-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-500">Email Address</label>
+              <Card>
+                <CardHeader className="border-b border-surface-border/50 pb-4">
+                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Invite Member</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <form onSubmit={handleInviteTeamMember} className="flex flex-col sm:flex-row gap-3">
                     <input
                       type="email"
-                      required
-                      placeholder="colleague@yourcompany.com"
+                      placeholder="teammate@example.com"
                       value={inviteEmail}
                       onChange={(e) => setInviteEmail(e.target.value)}
-                      className="w-full bg-white border border-slate-205 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
+                      className="w-full sm:flex-1 bg-cream-50 rounded-button px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                     />
-                  </div>
-                  <div className="flex gap-2">
-                    <div className="space-y-1.5 flex-1">
-                      <label className="text-[10px] uppercase font-bold text-slate-500">Role</label>
-                      <select
-                        value={inviteRole}
-                        onChange={(e) => setInviteRole(e.target.value as any)}
-                        className="w-full bg-white border border-slate-205 rounded-xl h-9 px-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-slate-350"
-                      >
-                        <option value="manager">Manager</option>
-                        <option value="viewer">Viewer</option>
-                      </select>
-                    </div>
                     <button
                       type="submit"
-                      disabled={isSaving}
-                      className="bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white font-bold text-xs h-9 px-4 rounded-xl flex items-center justify-center gap-1.5 transition-all self-end cursor-pointer shadow-sm"
+                      className="btn-primary px-5 py-2.5 rounded-button text-xs font-bold shrink-0"
                     >
-                      <Plus className="w-4 h-4" />
-                      Invite
+                      Send Invite
                     </button>
-                  </div>
-                </form>
-              </div>
+                  </form>
+                </CardContent>
+              </Card>
+
+              {team.length > 0 && (
+                <Card>
+                  <CardHeader className="border-b border-surface-border/50 pb-4">
+                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Current Members</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 p-0 divide-y divide-surface-border/50">
+                    {team.map((m) => (
+                      <div key={m.id} className="p-4 flex items-center justify-between hover:bg-cream-50/20 transition-colors">
+                        <div>
+                          <p className="text-xs font-bold text-ink-black">{m.email}</p>
+                          <p className="text-[10px] text-ink-secondary capitalize">{m.role} • {m.status}</p>
+                        </div>
+                        {m.role !== "owner" && (
+                          <button
+                            onClick={() => handleRemoveTeamMember(m.id, m.email)}
+                            className="p-2 rounded-full hover:bg-danger-light text-ink-secondary hover:text-danger-dark border-none bg-transparent cursor-pointer"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
             </div>
           )}
+
+          {/* TAB 6: PRICING & PLANS */}
+          {activeTab === "plans" && (
+            <div className="space-y-6 animate-in fade-in duration-200">
+              <Card>
+                <CardHeader className="border-b border-[#EEE9E4] pb-4">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black flex items-center gap-1.5">
+                        <Sparkles className="w-4 h-4 text-[#E91E63]" />
+                        Billing Plan & Packages
+                      </CardTitle>
+                      <CardDescription className="text-xs text-ink-secondary mt-0.5">Choose a workspace subscription plan to unlock WhatsApp alerts, unlimited invoicing, and multi-user team portals.</CardDescription>
+                    </div>
+                    {subscription && (
+                      <span className="px-3 py-1 rounded-pill bg-[#FAF8F5] border border-[#EEE9E4] text-[10px] font-bold text-ink-secondary uppercase tracking-wider">
+                        Current: <strong className="text-[#E91E63]">{subscription.plan}</strong>
+                      </span>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-6">
+                  {/* Active Subscription Summary card */}
+                  {subscription && (
+                    <div className="bg-[#FAF8F5] border border-[#EEE9E4]/60 rounded-card p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <div>
+                        <span className="text-[10px] text-ink-secondary font-bold uppercase block">Workspace Plan Details</span>
+                        <p className="text-sm font-bold text-[#0A0A0A] mt-0.5 capitalize">{subscription.plan} Package ({subscription.billing_cycle})</p>
+                        <p className="text-[10px] text-ink-secondary mt-0.5">
+                          Status: <span className="text-green-600 font-extrabold capitalize">{subscription.status}</span> 
+                          {subscription.current_period_end && ` • Renews/Expires: ${formatDate(subscription.current_period_end)}`}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] text-ink-secondary font-bold uppercase block">UPI Payment Destination</span>
+                        <p className="text-xs font-mono font-bold text-ink-primary mt-0.5">{business?.upi_id || "None set — configure in Banking settings"}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pricing Comparison Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {[
+                      {
+                        id: "solo",
+                        name: "Solo Tier",
+                        price: "₹799",
+                        period: "/ month",
+                        desc: "Perfect for freelancers and individual service providers.",
+                        features: [
+                          "Up to 30 invoices per month",
+                          "Unlimited client registrations",
+                          "WhatsApp automated reminders",
+                          "Razorpay payment links checkout",
+                          "Custom layouts & branding",
+                          "Remove CollectBot watermark logo"
+                        ]
+                      },
+                      {
+                        id: "business",
+                        name: "Business Tier",
+                        price: "₹2,499",
+                        period: "/ month",
+                        desc: "Designed for small agencies and growing service teams.",
+                        features: [
+                          "Unlimited monthly invoices",
+                          "Unlimited client registrations",
+                          "WhatsApp & Email alert channels",
+                          "SMS automated backup channels",
+                          "Razorpay payment links checkout",
+                          "Recurring subscription billing templates",
+                          "Customizable reminder timing rules",
+                          "Up to 3 multi-user team member accounts",
+                          "Priority email & ticket support"
+                        ],
+                        popular: true
+                      },
+                      {
+                        id: "scale",
+                        name: "Scale Tier",
+                        price: "₹3,999",
+                        period: "/ month",
+                        desc: "Corporate tier with advanced database API & whitelabeling.",
+                        features: [
+                          "All Business tier inclusions",
+                          "Up to 5 multi-user team member accounts",
+                          "Complete whitelabeling (your own domain)",
+                          "Dedicated client portal links",
+                          "Advanced profit/overdue insights reports",
+                          "CSV/Bulk imports & API integration key",
+                          "Tally Ledger exports",
+                          "Dedicated Account Manager support"
+                        ]
+                      }
+                    ].map((plan) => {
+                      const isCurrent = subscription?.plan === plan.id
+                      return (
+                        <div 
+                          key={plan.id} 
+                          className={cn(
+                            "border rounded-card p-6 flex flex-col justify-between transition-all duration-300 relative bg-white",
+                            plan.popular 
+                              ? "border-[#E91E63] shadow-card scale-100 md:scale-[1.02] z-10" 
+                              : "border-[#EEE9E4] hover:shadow-floating hover:border-ink-secondary/25"
+                          )}
+                        >
+                          {plan.popular && (
+                            <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#E91E63] text-white text-[9px] font-bold uppercase tracking-wider px-3 py-1 rounded-pill shadow-soft">
+                              Most Popular
+                            </span>
+                          )}
+
+                          <div>
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-ink-black">{plan.name}</h4>
+                            <div className="flex items-baseline mt-4">
+                              <span className="text-3xl font-extrabold tracking-tight text-ink-black font-display">{plan.price}</span>
+                              <span className="text-[10px] text-ink-secondary ml-1 font-semibold">{plan.period}</span>
+                            </div>
+                            <p className="text-[10px] text-ink-secondary mt-2.5 font-medium leading-relaxed">{plan.desc}</p>
+                            
+                            <ul className="mt-6 space-y-2.5">
+                              {plan.features.map((feat, idx) => (
+                                <li key={idx} className="flex items-start gap-2 text-[10px] text-ink-secondary font-semibold">
+                                  <Check className="w-3.5 h-3.5 text-[#E91E63] shrink-0 mt-0.5" />
+                                  <span>{feat}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+
+                          <div className="mt-8">
+                            <button
+                              onClick={() => handleUpgradePlan(plan.id)}
+                              disabled={isCurrent || isSaving}
+                              className={cn(
+                                "w-full py-2.5 rounded-pill text-xs font-bold shadow-soft transition-all cursor-pointer flex items-center justify-center gap-1.5",
+                                isCurrent 
+                                  ? "bg-cream-100 text-ink-secondary border border-[#EEE9E4] shadow-none cursor-default"
+                                  : plan.popular
+                                    ? "bg-[#E91E63] hover:bg-[#D81B60] text-white border-none"
+                                    : "bg-white border border-[#EEE9E4] text-[#0A0A0A] hover:bg-cream-50"
+                              )}
+                            >
+                              {isCurrent ? "Active Plan" : `Upgrade to ${plan.id.toUpperCase()}`}
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
         </div>
+
       </div>
+
     </div>
   )
 }

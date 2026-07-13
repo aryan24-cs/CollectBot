@@ -1,132 +1,232 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
-@theme inline {
+@theme {
+  /* Design System Colors */
+  --color-cream-50: #FAF8F5;
+  --color-cream-100: #F5F1EE;   /* Main app background */
+  --color-cream-200: #EDE7E1;
+  --color-cream-300: #E5DDD5;
+
+  --color-surface-white: #FFFFFF;
+  --color-surface-soft: #FDFCFB;
+  --color-surface-border: #EEE9E4;
+
+  --color-ink-black: #0A0A0A;      /* Bold numbers/headings */
+  --color-ink-primary: #1A1A1A;    /* Main text */
+  --color-ink-secondary: #6B6B6B;  /* Sub text */
+  --color-ink-muted: #9B9B9B;      /* Muted labels */
+  --color-ink-light: #C4C4C4;      /* Light labels */
+
+  --color-brand-50: #FDF2F7;
+  --color-brand-100: #FCE4EC;
+  --color-brand-200: #F8BBD9;
+  --color-brand-300: #F48FB1;
+  --color-brand-400: #F06292;
+  --color-brand-500: #EC407A;        /* Primary brand color */
+  --color-brand-600: #E91E63;        /* Main brand (pink) */
+  --color-brand-700: #D81B60;
+  --color-brand-800: #C2185B;
+  --color-brand-900: #AD1457;
+
+  --color-success-light: #E8F5E9;
+  --color-success-DEFAULT: #4CAF50;
+  --color-success-dark: #2E7D32;
+
+  --color-warning-light: #FFF8E1;
+  --color-warning-DEFAULT: #FFC107;
+  --color-warning-dark: #F57C00;
+
+  --color-danger-light: #FFEBEE;
+  --color-danger-DEFAULT: #F44336;
+  --color-danger-dark: #C62828;
+
+  --color-info-light: #E3F2FD;
+  --color-info-DEFAULT: #2196F3;
+  --color-info-dark: #1565C0;
+
+  --color-dark: #1A1A1A;
+  --color-dark-soft: #252525;
+  --color-dark-card: #0A0A0A;
+
+  /* Typography Scale */
+  --font-sans: 'Inter', 'system-ui', '-apple-system', 'sans-serif';
+  --font-display: 'Inter', 'sans-serif';
+
+  --text-stat-sm: 24px;
+  --text-stat-sm--line-height: 32px;
+  --text-stat-sm--font-weight: 700;
+
+  --text-stat-md: 32px;
+  --text-stat-md--line-height: 40px;
+  --text-stat-md--font-weight: 700;
+
+  --text-stat-lg: 48px;
+  --text-stat-lg--line-height: 56px;
+  --text-stat-lg--font-weight: 700;
+
+  --text-stat-xl: 64px;
+  --text-stat-xl--line-height: 72px;
+  --text-stat-xl--font-weight: 700;
+
+  /* Radii */
+  --radius-card: 20px;
+  --radius-card-lg: 24px;
+  --radius-pill: 9999px;
+  --radius-button: 12px;
+
+  /* Shadows */
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-card-hover: 0 4px 12px rgba(0,0,0,0.06), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-floating: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-soft: 0 2px 8px rgba(0,0,0,0.04);
+
+  /* Custom Spacings */
+  --spacing-18: 4.5rem;
+  --spacing-22: 5.5rem;
+
+  /* Shadcn standard theme tokens mapping inside Tailwind 4 */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #F5F1EE;      /* cream-100 */
+  --foreground: #1A1A1A;      /* ink-primary */
+  --card: #FFFFFF;            /* surface-white */
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+  --primary: #E91E63;         /* brand-600 */
+  --primary-foreground: #FFFFFF;
+  --secondary: #FAF8F5;       /* cream-50 */
+  --secondary-foreground: #1A1A1A;
+  --muted: #EDE7E1;           /* cream-200 */
+  --muted-foreground: #6B6B6B;/* ink-secondary */
+  --accent: #FAF8F5;
+  --accent-foreground: #1A1A1A;
+  --destructive: #F44336;     /* danger-DEFAULT */
+  --destructive-foreground: #FFFFFF;
+  --border: #EEE9E4;          /* surface-border */
+  --input: #EEE9E4;
+  --ring: rgba(233, 30, 99, 0.2);
+  --radius: 12px;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
-    @apply font-sans;
+    font-family: 'Inter', sans-serif;
+    font-feature-settings: 'ss01', 'cv11';
+    -webkit-font-smoothing: antialiased;
   }
+  
+  body {
+    @apply bg-cream-100 text-ink-primary;
+  }
+  
+  * {
+    @apply border-surface-border;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface-white rounded-card shadow-card p-6 border border-surface-border/50;
+  }
+  
+  .card-dark {
+    @apply bg-dark text-white rounded-card shadow-card p-6;
+  }
+  
+  .stat-number {
+    @apply text-ink-black font-bold tracking-tight;
+  }
+  
+  .pill {
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5 
+           rounded-pill bg-surface-white shadow-soft
+           text-xs font-semibold border border-surface-border;
+  }
+  
+  .pill-dark {
+    @apply inline-flex items-center gap-2 px-3.5 py-1.5
+           rounded-pill bg-dark text-white
+           text-xs font-semibold;
+  }
+  
+  .btn-primary {
+    @apply bg-brand-600 hover:bg-brand-700 text-white
+           px-5 py-2.5 rounded-button font-medium
+           transition-all shadow-soft cursor-pointer inline-flex items-center justify-center gap-1.5;
+  }
+  
+  .btn-secondary {
+    @apply bg-surface-white hover:bg-cream-50 text-ink-primary
+           px-5 py-2.5 rounded-button font-medium
+           transition-all shadow-soft border border-surface-border cursor-pointer inline-flex items-center justify-center gap-1.5;
+  }
+  
+  .btn-dark {
+    @apply bg-dark hover:bg-dark-soft text-white
+           px-5 py-2.5 rounded-button font-medium
+           transition-all cursor-pointer inline-flex items-center justify-center gap-1.5;
+  }
+  
+  .input-clean {
+    @apply w-full bg-surface-white rounded-button
+           px-4 py-3 text-ink-primary
+           placeholder:text-ink-muted
+           focus:outline-none focus:ring-2 focus:ring-brand-500/20
+           border-none shadow-soft transition-all;
+  }
+  
+  .badge-soft {
+    @apply inline-flex items-center px-2.5 py-1 rounded-pill
+           text-xs font-semibold;
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D5CDC6;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B8AFA7;
 }
 
 @media print {

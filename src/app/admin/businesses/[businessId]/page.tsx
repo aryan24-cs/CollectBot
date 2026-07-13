@@ -13,12 +13,17 @@ import {
   FileText,
   User,
   KeyRound,
-  Info
+  Info,
+  Sliders,
+  Calendar,
+  Layers,
+  Activity,
+  Check
 } from "lucide-react"
 import { toast } from "sonner"
 import Link from "next/link"
 import { useParams } from "next/navigation"
-import { formatCurrency, formatDate } from "@/lib/utils"
+import { formatCurrency, formatDate, cn } from "@/lib/utils"
 
 export default function BusinessDetailPage() {
   const params = useParams()
@@ -182,9 +187,9 @@ export default function BusinessDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Loader2 className="w-9 h-9 text-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-medium">Retrieving database state and overrides...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-ink-secondary">
+        <Loader2 className="w-9 h-9 text-[#E91E63] animate-spin mb-4" />
+        <p className="text-xs font-semibold">Retrieving database state and overrides...</p>
       </div>
     )
   }
@@ -208,28 +213,38 @@ export default function BusinessDetailPage() {
     { key: "analytics_advanced", label: "Advanced Insights", desc: "Profit trends, overdue allocations, and forecasting charts." },
   ]
 
+  // Calculate usage percentages
+  const maxInvs = effectiveFeatures?.max_invoices || 1
+  const invsPct = maxInvs === -1 ? 10 : Math.min((stats.totalInvoices / maxInvs) * 100, 100)
+  
+  const maxClis = effectiveFeatures?.max_clients || 1
+  const clisPct = maxClis === -1 ? 10 : Math.min((stats.totalClients / maxClis) * 100, 100)
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-ink-primary select-none max-w-6xl mx-auto pb-10">
       {/* Back & Title */}
       <div className="flex flex-col gap-2">
-        <Link href="/admin/businesses" className="text-slate-400 hover:text-white flex items-center gap-1 text-xs font-semibold">
+        <Link href="/admin/businesses" className="text-ink-secondary hover:text-[#0A0A0A] flex items-center gap-1 text-xs font-bold transition-colors">
           <ArrowLeft className="w-4 h-4" /> Back to registry directory
         </Link>
-        <div className="flex justify-between items-start border-b border-slate-800/80 pb-4 mt-2">
+        <div className="flex justify-between items-start border-b border-[#EEE9E4] pb-4 mt-2">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white">{biz.name}</h1>
-            <p className="text-xs text-slate-400 mt-1">ID: <span className="font-mono">{biz.id}</span> • Registered: {formatDate(biz.created_at)}</p>
+            <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A] font-display">{biz.name}</h1>
+            <p className="text-xs text-ink-secondary mt-1">ID: <span className="font-mono">{biz.id}</span> • Registered: {formatDate(biz.created_at)}</p>
           </div>
-          <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase tracking-wide border ${
-            isBlocked ? "bg-rose-500/10 text-rose-400 border-rose-500/20" : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
-          }`}>
-            {isBlocked ? "Blocked" : "Active status"}
+          <span className={cn(
+            "px-3 py-1 rounded-pill text-[10px] font-bold uppercase tracking-wider border shadow-sm transition-all",
+            isBlocked 
+              ? "bg-[#FFEBEE] text-[#C62828] border-[#EF9A9A]/30" 
+              : "bg-[#E8F5E9] text-[#2E7D32] border-[#A5D6A7]/30"
+          )}>
+            {isBlocked ? "Suspended" : "Active workspace"}
           </span>
         </div>
       </div>
 
       {/* Tabs list */}
-      <div className="flex border-b border-slate-800/80 gap-6">
+      <div className="flex border-b border-[#EEE9E4] gap-6">
         {[
           { id: "overview", label: "Overview details" },
           { id: "features", label: "Access & Overrides" },
@@ -239,13 +254,14 @@ export default function BusinessDetailPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-3 text-xs font-semibold transition-all relative ${
-              activeTab === tab.id ? "text-indigo-400" : "text-slate-400 hover:text-white"
-            }`}
+            className={cn(
+              "pb-3 text-xs font-bold transition-all relative cursor-pointer",
+              activeTab === tab.id ? "text-[#E91E63]" : "text-ink-secondary hover:text-[#0A0A0A]"
+            )}
           >
             {tab.label}
             {activeTab === tab.id && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500" />
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#E91E63] rounded-full" />
             )}
           </button>
         ))}
@@ -262,43 +278,44 @@ export default function BusinessDetailPage() {
             <div className="md:col-span-8 space-y-6">
               
               {/* Profile Details */}
-              <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3">Owner Contact details</h3>
-                <div className="grid grid-cols-2 gap-4 text-xs">
+              <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-cream-100/40 to-transparent rounded-bl-full pointer-events-none" />
+                <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3">Owner Contact details</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs relative z-10">
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Owner Name</span>
-                    <p className="text-white mt-0.5 font-medium">{biz.name}</p>
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Owner Name</span>
+                    <p className="text-[#0A0A0A] mt-0.5 font-bold">{biz.name}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Email Address</span>
-                    <p className="text-white mt-0.5 font-medium">{biz.email || "N/A"}</p>
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Email Address</span>
+                    <p className="text-[#0A0A0A] mt-0.5 font-bold">{biz.email || "N/A"}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Telephone</span>
-                    <p className="text-white mt-0.5 font-medium">{biz.phone || "N/A"}</p>
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Telephone</span>
+                    <p className="text-[#0A0A0A] mt-0.5 font-bold">{biz.phone || "N/A"}</p>
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Location</span>
-                    <p className="text-white mt-0.5 font-medium">{biz.city || "N/A"}, {biz.state || "N/A"}</p>
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Location</span>
+                    <p className="text-[#0A0A0A] mt-0.5 font-bold">{biz.city || "N/A"}, {biz.state || "N/A"}</p>
                   </div>
                 </div>
               </div>
 
               {/* Operations Stats */}
-              <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3">Operational Stats</h3>
+              <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+                <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3">Operational Stats</h3>
                 <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-800/50">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Invoices Created</span>
-                    <p className="text-xl font-extrabold text-white mt-1">{stats.totalInvoices}</p>
+                  <div className="bg-cream-50 p-4 rounded-card border border-[#EEE9E4]/65 shadow-soft hover:shadow-floating transition-all duration-300">
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Invoices Created</span>
+                    <p className="text-xl font-extrabold text-[#0A0A0A] mt-1">{stats.totalInvoices}</p>
                   </div>
-                  <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-800/50">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Active Clients</span>
-                    <p className="text-xl font-extrabold text-white mt-1">{stats.totalClients}</p>
+                  <div className="bg-cream-50 p-4 rounded-card border border-[#EEE9E4]/65 shadow-soft hover:shadow-floating transition-all duration-300">
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Active Clients</span>
+                    <p className="text-xl font-extrabold text-[#0A0A0A] mt-1">{stats.totalClients}</p>
                   </div>
-                  <div className="bg-slate-900/40 p-4 rounded-lg border border-slate-800/50">
-                    <span className="text-[10px] text-slate-500 font-bold block uppercase">Collected Volume</span>
-                    <p className="text-xl font-extrabold text-white mt-1">{formatCurrency(stats.totalRevenue)}</p>
+                  <div className="bg-cream-50 p-4 rounded-card border border-[#EEE9E4]/65 shadow-soft hover:shadow-floating transition-all duration-300">
+                    <span className="text-[10px] text-ink-secondary font-bold block uppercase">Collected Volume</span>
+                    <p className="text-xl font-extrabold text-[#0A0A0A] mt-1">{formatCurrency(stats.totalRevenue)}</p>
                   </div>
                 </div>
               </div>
@@ -307,20 +324,20 @@ export default function BusinessDetailPage() {
 
             {/* Private notes */}
             <div className="md:col-span-4 space-y-6">
-              <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3">Private Admin Notes</h3>
-                <p className="text-[10px] text-slate-400">Notes entered here are restricted to admin access only and not visible to the client.</p>
+              <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+                <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3">Private Admin Notes</h3>
+                <p className="text-[10px] text-ink-secondary">Notes entered here are restricted to admin access only and not visible to the client.</p>
                 <textarea
                   value={adminNotes}
                   onChange={(e) => setAdminNotes(e.target.value)}
                   placeholder="Record onboarding logs, compliance statuses, custom requests..."
                   rows={6}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 placeholder-slate-600 focus:outline-none focus:border-slate-700 transition-all resize-none"
+                  className="w-full bg-cream-50 border border-[#EEE9E4] rounded-card p-3 text-xs font-semibold text-ink-primary placeholder:text-ink-secondary/50 focus:outline-none focus:ring-1 focus:ring-[#E91E63]/25 transition-all resize-none"
                 />
                 <button
                   onClick={saveNotes}
                   disabled={notesSaving}
-                  className="w-full bg-indigo-650 hover:bg-indigo-500 text-white rounded-lg py-2 text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="w-full bg-[#E91E63] hover:bg-[#D81B60] text-white rounded-pill py-2.5 text-xs font-bold shadow-soft transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-none cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   {notesSaving ? "Saving Notes..." : "Save Admin Notes"}
@@ -338,72 +355,91 @@ export default function BusinessDetailPage() {
             {/* Toggles panel */}
             <div className="lg:col-span-8 space-y-6">
               
-              <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+              <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#EEE9E4] pb-3.5 gap-2">
                   <div>
-                    <h3 className="text-sm font-semibold text-white tracking-tight">Access Gate Overrides</h3>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Force enable/disable specific SaaS module gates.</p>
+                    <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight">Access Gate Overrides</h3>
+                    <p className="text-[10px] text-ink-secondary mt-0.5">Force enable/disable specific SaaS module gates.</p>
                   </div>
                   <div className="flex gap-2">
                     <button
                       onClick={resetOverrides}
-                      className="px-2.5 py-1.5 border border-slate-800 hover:bg-slate-800 text-[10px] font-bold text-slate-400 hover:text-white rounded transition-all"
+                      className="px-3.5 py-1.5 border border-[#EEE9E4] hover:bg-cream-50 text-[10px] font-bold text-ink-secondary hover:text-[#0A0A0A] rounded-pill transition-all cursor-pointer bg-white"
                     >
-                      Reset to defaults
+                      Reset Defaults
                     </button>
                     <button
                       onClick={saveOverrides}
                       disabled={featuresSaving}
-                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold shadow-sm transition-all flex items-center gap-1"
+                      className="px-4 py-1.5 bg-[#E91E63] hover:bg-[#D81B60] text-white rounded-pill text-[10px] font-bold shadow-soft hover:shadow-floating transition-all flex items-center gap-1.5 border-none cursor-pointer"
                     >
                       <Save className="w-3 h-3" />
-                      Save configurations
+                      Save overrides
                     </button>
                   </div>
                 </div>
 
-                {/* Features toggles list */}
-                <div className="space-y-4 pt-1">
+                {/* Features segmented toggles list */}
+                <div className="space-y-3 pt-1">
                   {featuresList.map((feat) => {
                     const overrideKey = `override_${feat.key}`
-                    const overrideVal = overrides[overrideKey] // true, false, null/undefined
+                    const overrideVal = overrides[overrideKey]
                     const effectiveVal = effectiveFeatures?.[feat.key] ?? false
 
                     return (
-                      <div key={feat.key} className="flex justify-between items-center bg-slate-900/10 border border-slate-800/40 rounded-lg p-3 hover:border-slate-800 transition-all">
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-semibold text-white flex items-center gap-1.5">
+                      <div key={feat.key} className="flex flex-col sm:flex-row sm:items-center justify-between bg-[#FAF8F5] border border-[#EEE9E4]/40 rounded-card p-4 hover:border-[#EEE9E4]/80 transition-all gap-4">
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-xs font-bold text-[#0A0A0A] flex items-center gap-1.5 flex-wrap">
                             {feat.label}
                             {overrideVal !== null && overrideVal !== undefined && (
-                              <span className="text-[8px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1 py-0.2 rounded">
+                              <span className="text-[8px] font-bold uppercase tracking-wider bg-[#FFF8E1] text-[#F57F17] border border-[#FFC107]/20 px-2 py-0.5 rounded-pill shrink-0">
                                 Overridden
                               </span>
                             )}
                           </p>
-                          <span className="text-[10px] text-slate-500 block max-w-md">{feat.desc}</span>
+                          <span className="text-[10px] text-ink-secondary block max-w-md truncate sm:whitespace-normal">{feat.desc}</span>
                         </div>
 
-                        {/* Selection status */}
-                        <div className="flex items-center gap-4">
-                          {/* Visual Indicator of effective status */}
-                          <span className={`inline-block w-2 h-2 rounded-full ${
-                            effectiveVal ? "bg-emerald-500" : "bg-rose-500"
-                          }`} />
+                        {/* Segmented Selector pills */}
+                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                          {/* Live Indicator of effective status */}
+                          <span className={cn(
+                            "inline-block w-2.5 h-2.5 rounded-full shadow-soft",
+                            effectiveVal ? "bg-[#4CAF50]" : "bg-[#F44336]"
+                          )} />
 
-                          <select
-                            value={overrideVal === true ? "on" : overrideVal === false ? "off" : "default"}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              if (val === "on") setOverrideVal(feat.key, true)
-                              else if (val === "off") setOverrideVal(feat.key, false)
-                              else setOverrideVal(feat.key, null)
-                            }}
-                            className="bg-slate-900 border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-300 focus:outline-none"
-                          >
-                            <option value="default">Use plan defaults</option>
-                            <option value="on">Force Enable</option>
-                            <option value="off">Force Disable</option>
-                          </select>
+                          <div className="inline-flex rounded-pill p-0.5 bg-cream-100 border border-[#EEE9E4]/60">
+                            {[
+                              { val: "default", label: "Default" },
+                              { val: "on", label: "Enable" },
+                              { val: "off", label: "Disable" }
+                            ].map((opt) => {
+                              const isSelected = 
+                                opt.val === "default" && (overrideVal === null || overrideVal === undefined) ||
+                                opt.val === "on" && overrideVal === true ||
+                                opt.val === "off" && overrideVal === false
+
+                              return (
+                                <button
+                                  type="button"
+                                  key={opt.val}
+                                  onClick={() => {
+                                    if (opt.val === "on") setOverrideVal(feat.key, true)
+                                    else if (opt.val === "off") setOverrideVal(feat.key, false)
+                                    else setOverrideVal(feat.key, null)
+                                  }}
+                                  className={cn(
+                                    "px-2.5 py-1 text-[9px] font-bold rounded-pill transition-all cursor-pointer border border-transparent",
+                                    isSelected 
+                                      ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]" 
+                                      : "text-ink-secondary hover:text-ink-primary bg-transparent"
+                                  )}
+                                >
+                                  {opt.label}
+                                </button>
+                              )
+                            })}
+                          </div>
                         </div>
                       </div>
                     )
@@ -416,40 +452,48 @@ export default function BusinessDetailPage() {
             {/* Special flags */}
             <div className="lg:col-span-4 space-y-6">
               
-              <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-4">
-                <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3 flex items-center gap-1.5">
+              <div className="bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-4">
+                <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3 flex items-center gap-1.5">
                   <ShieldAlert className="w-4 h-4 text-amber-500" />
                   Operational Flags
                 </h3>
                 
-                <div className="space-y-4 pt-1">
+                <div className="space-y-5 pt-1">
                   
-                  {/* Full Access */}
+                  {/* Full Access - Styled Slide Toggle */}
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold text-white block">Full Access Override</span>
-                      <p className="text-[9px] text-slate-500">Unlocks all limits & features completely.</p>
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-bold text-[#0A0A0A] block">Full Access Override</span>
+                      <p className="text-[9px] text-ink-secondary leading-normal">Unlocks all limits & features completely.</p>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isFullAccess}
-                      onChange={(e) => setIsFullAccess(e.target.checked)}
-                      className="rounded border-slate-800 text-indigo-600 focus:ring-indigo-650"
-                    />
+                    
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input 
+                        type="checkbox" 
+                        checked={isFullAccess}
+                        onChange={(e) => setIsFullAccess(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-9 h-5 bg-cream-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#EEE9E4] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#E91E63]" />
+                    </label>
                   </div>
 
-                  {/* Block Business */}
+                  {/* Block Business - Styled Slide Toggle */}
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-semibold text-white block">Suspend Workspace</span>
-                      <p className="text-[9px] text-slate-500">Block logins and restrict billing logs.</p>
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-bold text-[#0A0A0A] block">Suspend Workspace</span>
+                      <p className="text-[9px] text-ink-secondary leading-normal">Block logins and restrict billing logs.</p>
                     </div>
-                    <input
-                      type="checkbox"
-                      checked={isBlocked}
-                      onChange={(e) => setIsBlocked(e.target.checked)}
-                      className="rounded border-slate-800 text-rose-600 focus:ring-rose-500"
-                    />
+                    
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input 
+                        type="checkbox" 
+                        checked={isBlocked}
+                        onChange={(e) => setIsBlocked(e.target.checked)}
+                        className="sr-only peer" 
+                      />
+                      <div className="w-9 h-5 bg-cream-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#EEE9E4] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#F44336]" />
+                    </label>
                   </div>
 
                 </div>
@@ -462,18 +506,19 @@ export default function BusinessDetailPage() {
 
         {/* TAB 3: SUBSCRIPTION */}
         {activeTab === "subscription" && (
-          <div className="max-w-2xl bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-6">
-            <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3">Manage Plan & Trial terms</h3>
+          <div className="max-w-2xl bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-6 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-cream-100/40 to-transparent rounded-bl-full pointer-events-none" />
+            <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3">Manage Plan & Trial terms</h3>
 
-            <div className="space-y-4">
+            <div className="space-y-4 relative z-10">
               
               {/* Select Plan */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold block">Assigned Tier</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-ink-secondary uppercase font-bold block">Assigned Tier</label>
                 <select
                   value={selectedPlan}
                   onChange={(e) => setSelectedPlan(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                  className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-bold text-ink-primary focus:outline-none cursor-pointer"
                 >
                   <option value="free">Free Tier</option>
                   <option value="solo">Solo Tier</option>
@@ -483,12 +528,12 @@ export default function BusinessDetailPage() {
               </div>
 
               {/* Status */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold block">Status</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-ink-secondary uppercase font-bold block">Status</label>
                 <select
                   value={subStatus}
                   onChange={(e) => setSubStatus(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                  className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-bold text-ink-primary focus:outline-none cursor-pointer"
                 >
                   <option value="trialing">Trialing</option>
                   <option value="active">Active</option>
@@ -499,13 +544,13 @@ export default function BusinessDetailPage() {
               </div>
 
               {/* Trial Ends Date */}
-              <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase font-bold block">Trial Expiration Date</label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] text-ink-secondary uppercase font-bold block">Trial Expiration Date</label>
                 <input
                   type="date"
                   value={trialEndsAt}
                   onChange={(e) => setTrialEndsAt(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs font-medium text-slate-300 focus:outline-none focus:border-slate-700"
+                  className="w-full bg-cream-50 border border-[#EEE9E4] rounded-pill px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none"
                 />
               </div>
 
@@ -513,7 +558,7 @@ export default function BusinessDetailPage() {
               <button
                 onClick={saveSubscription}
                 disabled={subSaving}
-                className="w-full bg-indigo-650 hover:bg-indigo-500 text-white rounded-lg py-2 text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="w-full bg-[#E91E63] hover:bg-[#D81B60] text-white rounded-pill py-2.5 text-xs font-bold shadow-soft hover:shadow-floating transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border-none cursor-pointer"
               >
                 <Save className="w-3.5 h-3.5" />
                 {subSaving ? "Updating..." : "Apply Plan modifications"}
@@ -525,35 +570,35 @@ export default function BusinessDetailPage() {
 
         {/* TAB 4: USAGE LIMITS */}
         {activeTab === "usage" && (
-          <div className="max-w-xl bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-5 shadow-sm space-y-6">
-            <h3 className="text-sm font-semibold text-white tracking-tight border-b border-slate-800 pb-3">Monthly Usage allocations</h3>
+          <div className="max-w-xl bg-white border border-[#EEE9E4] rounded-card p-6 shadow-card space-y-6">
+            <h3 className="text-sm font-bold text-[#0A0A0A] tracking-tight border-b border-[#EEE9E4] pb-3">Monthly Usage allocations</h3>
 
-            <div className="space-y-4 pt-1">
+            <div className="space-y-5 pt-1">
               
               {/* Invoices */}
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-xs font-medium text-slate-400">
+                <div className="flex justify-between items-center text-xs font-semibold text-ink-secondary">
                   <span>Invoice creation limits</span>
-                  <span className="text-white font-semibold">{stats.totalInvoices} / {effectiveFeatures?.max_invoices === -1 ? "Unlimited" : effectiveFeatures?.max_invoices}</span>
+                  <span className="text-[#0A0A0A] font-bold">{stats.totalInvoices} / {effectiveFeatures?.max_invoices === -1 ? "Unlimited" : effectiveFeatures?.max_invoices}</span>
                 </div>
-                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div className="w-full bg-cream-100 h-2 rounded-full overflow-hidden border border-[#EEE9E4]/60">
                   <div 
-                    className="h-full rounded-full bg-indigo-500" 
-                    style={{ width: effectiveFeatures?.max_invoices === -1 ? "10%" : `${Math.min((stats.totalInvoices / (effectiveFeatures?.max_invoices || 1)) * 100, 100)}%` }}
+                    className="h-full rounded-full bg-[#E91E63]" 
+                    style={{ width: `${invsPct}%` }}
                   />
                 </div>
               </div>
 
               {/* Clients */}
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-xs font-medium text-slate-400">
+                <div className="flex justify-between items-center text-xs font-semibold text-ink-secondary">
                   <span>Client records limits</span>
-                  <span className="text-white font-semibold">{stats.totalClients} / {effectiveFeatures?.max_clients === -1 ? "Unlimited" : effectiveFeatures?.max_clients}</span>
+                  <span className="text-[#0A0A0A] font-bold">{stats.totalClients} / {effectiveFeatures?.max_clients === -1 ? "Unlimited" : effectiveFeatures?.max_clients}</span>
                 </div>
-                <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div className="w-full bg-cream-100 h-2 rounded-full overflow-hidden border border-[#EEE9E4]/60">
                   <div 
-                    className="h-full rounded-full bg-emerald-500" 
-                    style={{ width: effectiveFeatures?.max_clients === -1 ? "10%" : `${Math.min((stats.totalClients / (effectiveFeatures?.max_clients || 1)) * 100, 100)}%` }}
+                    className="h-full rounded-full bg-[#4CAF50]" 
+                    style={{ width: `${clisPct}%` }}
                   />
                 </div>
               </div>

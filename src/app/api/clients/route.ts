@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     // Get the user's business
     const { data: business, error: bizError } = await supabase
       .from("businesses")
-      .select("id")
+      .select("id, name")
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -67,6 +67,20 @@ export async function POST(request: NextRequest) {
       description: `Client "${clientData.name}" was registered.`,
       metadata: { client_id: client.id }
     })
+
+    // Send notification email to the client if email is provided
+    if (client.email) {
+      try {
+        const { sendClientAddedEmail } = await import("@/lib/email/send")
+        sendClientAddedEmail({
+          to: client.email,
+          clientName: client.name,
+          businessName: business.name || "a merchant",
+        }).catch(emailErr => console.error("Client email notification send failed:", emailErr))
+      } catch (e) {
+        console.error("Failed to import/trigger sendClientAddedEmail:", e)
+      }
+    }
 
     return NextResponse.json(client)
   } catch (err: any) {

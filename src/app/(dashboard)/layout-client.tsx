@@ -1,23 +1,28 @@
 "use client"
 
 import * as React from "react"
-import { X } from "lucide-react"
-import Sidebar from "@/components/layout/Sidebar"
-import Header from "@/components/layout/Header"
-import MobileNav from "@/components/layout/MobileNav"
-import { Button } from "@/components/ui/button"
-
+import { X, Menu } from "lucide-react"
 import { useRouter } from "next/navigation"
 
+import ContextSidebar from "@/components/layout/ContextSidebar"
+import TopBar from "@/components/layout/TopBar"
+import Header from "@/components/layout/Header"
+import MobileBottomNav from "@/components/layout/MobileBottomNav"
+import { Button } from "@/components/ui/button"
+
 interface LayoutClientProps {
-  businessName: string
+  business: {
+    id: string
+    name: string
+    logo_url?: string | null
+  }
   userEmail: string
   userName: string
   children: React.ReactNode
 }
 
 export default function DashboardLayoutClient({
-  businessName,
+  business,
   userEmail,
   userName,
   children,
@@ -51,7 +56,7 @@ export default function DashboardLayoutClient({
         e.preventDefault()
         router.push("/clients/new")
       } else if (e.key === "/") {
-        const searchInput = document.querySelector('input[placeholder*="Search" i]') as HTMLInputElement
+        const searchInput = document.querySelector('input[placeholder*="searching" i]') as HTMLInputElement
         if (searchInput) {
           e.preventDefault()
           searchInput.focus()
@@ -64,49 +69,54 @@ export default function DashboardLayoutClient({
   }, [router])
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col lg:flex-row">
-      {/* Sidebar - Desktop and toggleable Mobile */}
-      <div
-        className={`lg:block w-60 flex-shrink-0 transition-all duration-300 z-40 ${
-          isMobileMenuOpen ? "block" : "hidden lg:block"
-        }`}
-      >
-        {isMobileMenuOpen && (
-          <div 
-            className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm lg:hidden z-30" 
-            onClick={() => setIsMobileMenuOpen(false)} 
-          />
-        )}
-        <Sidebar
-          businessName={businessName}
-          userEmail={userEmail}
-          userName={userName}
-        />
-        {isMobileMenuOpen && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="fixed top-4 right-4 z-50 text-slate-500 hover:text-slate-950 lg:hidden bg-white border border-slate-200"
-            onClick={() => setIsMobileMenuOpen(false)}
-          >
-            <X className="w-5 h-5" />
-          </Button>
-        )}
+    <div className="min-h-screen bg-cream-100 text-ink-primary flex flex-col md:flex-row">
+      {/* Sidebars - Desktop (Dual Sidebar layout) */}
+      <div className="hidden md:flex flex-row shrink-0">
+        <ContextSidebar business={business} />
       </div>
 
-      {/* Main Page Content wrapper */}
-      <div className="flex-grow min-h-screen flex flex-col lg:pl-60">
-        {/* Mobile top header */}
-        <Header onMenuClick={() => setIsMobileMenuOpen(true)} />
+      {/* Mobile Top Header (hidden on desktop) */}
+      <Header onMenuClick={() => setIsMobileMenuOpen(true)} />
 
-        {/* Content Area */}
-        <main className="flex-1 p-6 lg:p-10 pt-24 lg:pt-10 pb-24 lg:pb-10 w-full max-w-7xl mx-auto">
+      {/* Mobile Context Sidebar Drawer (hidden on desktop) */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden flex">
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
+          <div className="relative bg-cream-100 w-64 h-full shadow-floating animate-in slide-in-from-left duration-250 z-10 flex">
+            {/* Render ContextSidebar inside drawer */}
+            <div className="flex-1 flex flex-col pt-12 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 z-20 text-ink-secondary hover:text-ink-primary"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <X className="w-5 h-5" />
+              </Button>
+              <ContextSidebar business={business} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content Area */}
+      <div className="flex-grow min-h-screen flex flex-col md:pl-0 pt-16 md:pt-0 pb-16 md:pb-0">
+        {/* TopBar on Desktop */}
+        <div className="hidden md:block">
+          <TopBar />
+        </div>
+        
+        {/* Main Body */}
+        <main className="flex-1 p-4 md:p-8 overflow-auto">
           {children}
         </main>
-
-        {/* Mobile bottom navigation bar */}
-        <MobileNav />
       </div>
+
+      {/* Fixed Bottom Navigation for Mobile */}
+      <MobileBottomNav />
     </div>
   )
 }

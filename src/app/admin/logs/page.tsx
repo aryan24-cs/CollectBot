@@ -43,34 +43,34 @@ export default function AdminLogsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center">
-        <Loader2 className="w-9 h-9 text-indigo-500 animate-spin mb-4" />
-        <p className="text-xs text-slate-400 font-medium">Loading platform audit logs and history entries...</p>
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-ink-secondary">
+        <Loader2 className="w-9 h-9 text-[#E91E63] animate-spin mb-4" />
+        <p className="text-xs font-semibold">Loading platform audit logs and history entries...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-ink-primary max-w-6xl mx-auto pb-10">
       {/* Header */}
-      <div className="flex justify-between items-center border-b border-slate-800/80 pb-5">
+      <div className="flex justify-between items-center border-b border-[#EEE9E4] pb-5">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight text-[#0A0A0A] font-display flex items-center gap-2">
             System Admin Audit Logs
           </h1>
-          <p className="text-xs text-slate-400 mt-1">Audit log of override configurations, pricing plan changes, and workspace blockings.</p>
+          <p className="text-xs text-ink-secondary mt-1 font-semibold">Audit log of override configurations, pricing plan changes, and workspace blockings.</p>
         </div>
       </div>
 
       {/* Filter panel */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-[#1E293B]/30 border border-slate-800/80 rounded-xl p-4 shadow-sm">
+      <div className="flex flex-col sm:flex-row gap-4 bg-white border border-[#EEE9E4] rounded-card p-4 shadow-card">
         {/* Action Filter */}
         <div className="flex-1 flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Action:</span>
+          <span className="text-[10px] uppercase font-bold text-ink-secondary tracking-wider">Action:</span>
           <select
             value={actionFilter}
             onChange={(e) => setActionFilter(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 focus:outline-none"
+            className="w-full bg-white border border-[#EEE9E4] rounded-pill px-4 py-2 text-xs font-bold text-ink-primary focus:outline-none cursor-pointer"
           >
             <option value="">All actions</option>
             <option value="update_feature_overrides">Update Feature Overrides</option>
@@ -83,11 +83,11 @@ export default function AdminLogsPage() {
 
         {/* Target Filter */}
         <div className="flex-1 flex items-center gap-2">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Target:</span>
+          <span className="text-[10px] uppercase font-bold text-ink-secondary tracking-wider">Target:</span>
           <select
             value={targetFilter}
             onChange={(e) => setTargetFilter(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-medium text-slate-300 focus:outline-none"
+            className="w-full bg-white border border-[#EEE9E4] rounded-pill px-4 py-2 text-xs font-bold text-ink-primary focus:outline-none cursor-pointer"
           >
             <option value="">All targets</option>
             <option value="business">Business</option>
@@ -98,11 +98,11 @@ export default function AdminLogsPage() {
       </div>
 
       {/* Audit list */}
-      <div className="bg-[#1E293B]/30 border border-slate-800/80 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-[#EEE9E4] rounded-card overflow-hidden shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left">
             <thead>
-              <tr className="border-b border-slate-800/80 bg-slate-900/40 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+              <tr className="border-b border-[#EEE9E4] bg-cream-50/50 text-[10px] font-bold text-ink-secondary uppercase tracking-widest">
                 <th className="p-4">Timestamp</th>
                 <th className="p-4">Admin user</th>
                 <th className="p-4">Action</th>
@@ -110,40 +110,40 @@ export default function AdminLogsPage() {
                 <th className="p-4">IP address</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/50 text-xs font-medium text-slate-300">
+            <tbody className="divide-y divide-[#EEE9E4]/60 text-xs font-semibold text-ink-primary">
               {logs.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="text-center py-20 text-slate-500 italic">
+                  <td colSpan={5} className="text-center py-20 text-ink-secondary italic">
                     No actions logged matching the specified filters.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-800/20 transition-all">
+                  <tr key={log.id} className="hover:bg-cream-50/30 transition-all">
                     {/* Timestamp */}
-                    <td className="p-4 text-slate-400 font-mono">
+                    <td className="p-4 text-ink-secondary font-mono">
                       {formatDate(log.created_at)}
                     </td>
 
                     {/* Admin Name */}
-                    <td className="p-4 font-semibold text-white">
+                    <td className="p-4 font-bold text-[#0A0A0A]">
                       {log.admin_users?.name || "System Automated"}
                     </td>
 
                     {/* Action badge */}
                     <td className="p-4">
-                      <span className="px-2 py-0.5 rounded text-[9px] font-extrabold uppercase tracking-wide border bg-slate-800/60 text-slate-300 border-slate-700/50">
+                      <span className="px-2 py-0.5 rounded-pill text-[9px] font-bold uppercase tracking-wider border bg-cream-100 text-ink-secondary border-[#EEE9E4]">
                         {log.action}
                       </span>
                     </td>
 
                     {/* Description */}
-                    <td className="p-4 text-slate-200">
+                    <td className="p-4 text-[#0A0A0A]">
                       {log.description}
                     </td>
 
                     {/* IP */}
-                    <td className="p-4 text-slate-500 font-mono">
+                    <td className="p-4 text-ink-secondary font-mono">
                       {log.ip_address || "N/A"}
                     </td>
                   </tr>

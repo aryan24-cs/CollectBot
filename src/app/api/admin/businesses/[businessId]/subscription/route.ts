@@ -65,6 +65,7 @@ export async function PATCH(
       if (plan) {
         updateData.plan_name = plan.name
         updateData.plan_id = plan.id
+        updateData.plan = plan.name
       }
     }
 

@@ -19,13 +19,12 @@ import {
 
 import getSupabaseBrowserClient from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 
-// Validation schemas for each step
+// Validation schemas
 const step1Schema = z.object({
   name: z.string().min(2, "Business name must be at least 2 characters"),
   businessType: z.enum(["Agency", "Freelancer", "Gym & Fitness", "Coaching Center", "School", "Retail", "Other"]),
@@ -69,6 +68,14 @@ const step3Schema = z.object({
     })
     .or(z.literal("")),
 })
+
+const INDIAN_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", 
+  "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", 
+  "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab", 
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", 
+  "Uttarakhand", "West Bengal", "Delhi", "Chandigarh", "Jammu & Kashmir", "Ladakh"
+]
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -149,10 +156,9 @@ export default function OnboardingPage() {
         if (business) {
           setBusinessId(business.id)
           
-          // Pre-fill Step 1
           form1.reset({
             name: business.name || "",
-            businessType: (business.logo_url as any) || "Other", // Logo url is reused or default type, let's map it. Wait, logo_url was text. Let's prefill fields.
+            businessType: "Other",
             email: business.email || user.email || "",
             phone: business.phone || "",
             address: business.address || "",
@@ -161,14 +167,12 @@ export default function OnboardingPage() {
             pincode: business.pincode || "",
           })
 
-          // Pre-fill Step 2
           form2.reset({
             gstin: business.gstin || "",
             pan: business.pan || "",
             invoice_prefix: business.invoice_prefix || "INV",
           })
 
-          // Pre-fill Step 3
           form3.reset({
             upi_id: business.upi_id || "",
             bank_name: business.bank_name || "",
@@ -176,7 +180,7 @@ export default function OnboardingPage() {
             ifsc_code: business.ifsc_code || "",
           })
 
-          // Determine step based on fields filled
+          // Set default step based on filled fields
           if (business.upi_id && business.bank_name) {
             setCurrentStep(4)
           } else if (business.invoice_prefix) {
@@ -187,7 +191,7 @@ export default function OnboardingPage() {
         }
       } catch (err: any) {
         console.error("Error loading onboarding details:", err)
-        setDbError("Failed to load business profile. Please refresh.")
+        setDbError("Failed to load business profile.")
       } finally {
         setLoading(false)
       }
@@ -196,7 +200,6 @@ export default function OnboardingPage() {
     loadBusiness()
   }, [supabase, router, form1, form2, form3])
 
-  // Save steps data to Supabase
   const onStep1Submit = async (values: z.infer<typeof step1Schema>) => {
     if (!businessId) return
     setSaving(true)
@@ -206,9 +209,6 @@ export default function OnboardingPage() {
         .from("businesses")
         .update({
           name: values.name,
-          // Storing businessType in logo_url for demo, or we can add it. Let's just save logo_url as the businessType for simplicity, or we can check the database column. Oh, businesses table doesn't have a business_type column! Let's check businesses columns in schema:
-          // name, logo_url, email, phone, address, city, state, pincode, gstin, pan, bank_name, account_number, ifsc_code, upi_id, currency, timezone, whatsapp_number, invoice_prefix, invoice_counter
-          // Let's store businessType in logo_url or just exclude it. Actually, logo_url can hold the string or we can store it in notes/logo_url. Storing in logo_url is fine.
           logo_url: values.businessType,
           email: values.email,
           phone: values.phone,
@@ -284,42 +284,40 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center text-slate-800">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-600 mb-4" />
-        <p className="text-slate-500">Loading your profile...</p>
+      <div className="min-h-screen bg-cream-50 flex flex-col items-center justify-center text-ink-primary select-none">
+        <Loader2 className="w-10 h-10 animate-spin text-brand-600 mb-4" />
+        <p className="text-xs font-semibold">Loading onboarding profile...</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8">
-      {/* Glow Effects */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full filter blur-[100px] pointer-events-none" />
-      <div className="absolute bottom-12 right-1/4 w-96 h-96 bg-violet-500/5 rounded-full filter blur-[100px] pointer-events-none" />
-
+    <div className="min-h-screen bg-cream-50 flex flex-col justify-between py-12 px-4 sm:px-6 lg:px-8 select-none text-ink-primary">
+      
       {/* Top Header */}
       <div className="w-full max-w-xl mx-auto flex items-center justify-between mb-8 z-10">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-600/10">
-            <Building2 className="w-5 h-5 text-white" />
+          <div className="w-8 h-8 rounded-full bg-dark flex items-center justify-center shadow-soft">
+            <span className="text-white font-extrabold text-sm">C</span>
           </div>
-          <span className="font-bold text-slate-900 text-lg">CollectBot Onboarding</span>
+          <span className="font-bold text-ink-black text-lg">Onboarding</span>
         </div>
-        <div className="text-sm text-slate-500">
-          Step <span className="text-slate-900 font-semibold">{currentStep}</span> of 4
+        <div className="text-xs text-ink-secondary font-semibold uppercase tracking-wider">
+          Step <span className="text-ink-black font-extrabold">{currentStep}</span> of 4
         </div>
       </div>
 
       {/* Progress Bar */}
       <div className="w-full max-w-xl mx-auto mb-10 z-10">
-        <Progress value={progressPercentage} className="h-2 bg-slate-200 [&>div]:bg-indigo-600" />
+        <Progress value={progressPercentage} className="h-2 bg-cream-200 [&>div]:bg-brand-600 rounded-full" />
       </div>
 
       {/* Main Card */}
       <div className="w-full max-w-xl mx-auto z-10 flex-grow flex items-center">
-        <Card className="w-full border-slate-200 bg-white text-slate-800 shadow-[0_4px_24px_rgba(0,0,0,0.02)] rounded-2xl">
+        <Card className="w-full bg-surface-white border border-surface-border/50 rounded-card shadow-card">
+          
           {dbError && (
-            <div className="m-6 p-4 rounded-lg bg-red-50 border border-red-100 text-red-650 text-sm flex gap-2 items-center">
+            <div className="m-6 p-4 rounded-button bg-danger-light border border-danger/25 text-danger-dark text-xs font-semibold flex gap-2 items-center">
               <AlertCircle className="w-4 h-4 flex-shrink-0" />
               <span>{dbError}</span>
             </div>
@@ -328,130 +326,138 @@ export default function OnboardingPage() {
           {/* STEP 1: BUSINESS DETAILS */}
           {currentStep === 1 && (
             <form onSubmit={form1.handleSubmit(onStep1Submit)}>
-              <CardHeader>
+              <CardHeader className="border-b border-surface-border/50 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-650">
+                  <div className="p-2.5 rounded-lg bg-brand-50 text-brand-600">
                     <Building2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-slate-900 font-bold">Business Details</CardTitle>
-                    <CardDescription className="text-slate-500">Let's set up your business identity.</CardDescription>
+                    <CardTitle className="text-lg text-ink-black font-bold uppercase tracking-wider">Business Details</CardTitle>
+                    <CardDescription className="text-ink-secondary text-[10px]">Configure your workspace profile name and settings.</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-4 pt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="text-slate-600 font-semibold">Business / Agency Name</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="name" className="text-[10px] uppercase font-bold text-ink-secondary">Business / Agency Name</Label>
+                    <input 
                       id="name" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                       placeholder="My Agency" 
                       {...form1.register("name")} 
                     />
-                    {form1.formState.errors.name && <p className="text-xs text-red-650">{form1.formState.errors.name.message}</p>}
+                    {form1.formState.errors.name && <p className="text-xs text-danger mt-1">{form1.formState.errors.name.message as string}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="businessType" className="text-slate-600 font-semibold">Business Type</Label>
+                  <div className="space-y-1">
+                    <Label htmlFor="businessType" className="text-[10px] uppercase font-bold text-ink-secondary">Business Category</Label>
                     <Select 
                        onValueChange={(val) => form1.setValue("businessType", val as any)} 
                        defaultValue={form1.getValues("businessType")}
                     >
-                      <SelectTrigger className="bg-white border-slate-200 text-slate-900 focus:ring-indigo-600">
+                      <SelectTrigger className="w-full bg-cream-50 text-ink-primary h-11 border-none shadow-soft rounded-button px-4 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-500/20 transition-all justify-between">
                         <SelectValue placeholder="Select business type" />
                       </SelectTrigger>
-                      <SelectContent className="bg-white border-slate-200 text-slate-900">
-                        <SelectItem value="Agency">Agency</SelectItem>
-                        <SelectItem value="Freelancer">Freelancer</SelectItem>
-                        <SelectItem value="Gym & Fitness">Gym & Fitness</SelectItem>
-                        <SelectItem value="Coaching Center">Coaching Center</SelectItem>
-                        <SelectItem value="School">School</SelectItem>
-                        <SelectItem value="Retail">Retail</SelectItem>
-                        <SelectItem value="Other">Other</SelectItem>
+                      <SelectContent className="bg-white border border-surface-border rounded-xl shadow-floating z-50">
+                        <SelectItem value="Agency" className="cursor-pointer text-xs py-1.5">Agency</SelectItem>
+                        <SelectItem value="Freelancer" className="cursor-pointer text-xs py-1.5">Freelancer</SelectItem>
+                        <SelectItem value="Gym & Fitness" className="cursor-pointer text-xs py-1.5">Gym & Fitness</SelectItem>
+                        <SelectItem value="Coaching Center" className="cursor-pointer text-xs py-1.5">Coaching Center</SelectItem>
+                        <SelectItem value="School" className="cursor-pointer text-xs py-1.5">School</SelectItem>
+                        <SelectItem value="Retail" className="cursor-pointer text-xs py-1.5">Retail</SelectItem>
+                        <SelectItem value="Other" className="cursor-pointer text-xs py-1.5">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-slate-600 font-semibold">Business Email</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="email" className="text-[10px] uppercase font-bold text-ink-secondary">Business Email</Label>
+                    <input 
                       id="email" 
                       type="email"
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                       placeholder="contact@myagency.com" 
                       {...form1.register("email")} 
                     />
-                    {form1.formState.errors.email && <p className="text-xs text-red-650">{form1.formState.errors.email.message}</p>}
+                    {form1.formState.errors.email && <p className="text-xs text-danger mt-1">{form1.formState.errors.email.message as string}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-slate-600 font-semibold">Business Phone</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="phone" className="text-[10px] uppercase font-bold text-ink-secondary">Business Phone</Label>
+                    <input 
                       id="phone" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
                       placeholder="9876543210" 
                       {...form1.register("phone")} 
                     />
-                    {form1.formState.errors.phone && <p className="text-xs text-red-650">{form1.formState.errors.phone.message}</p>}
+                    {form1.formState.errors.phone && <p className="text-xs text-danger mt-1">{form1.formState.errors.phone.message as string}</p>}
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="address" className="text-slate-600 font-semibold">Full Address</Label>
-                  <Input 
+                <div className="space-y-1">
+                  <Label htmlFor="address" className="text-[10px] uppercase font-bold text-ink-secondary">Full Office Address</Label>
+                  <input 
                     id="address" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                     placeholder="Floor 2, Central Business Hub" 
                     {...form1.register("address")} 
                   />
-                  {form1.formState.errors.address && <p className="text-xs text-red-650">{form1.formState.errors.address.message}</p>}
+                  {form1.formState.errors.address && <p className="text-xs text-danger mt-1">{form1.formState.errors.address.message as string}</p>}
                 </div>
 
                 <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="city" className="text-slate-600 font-semibold">City</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="city" className="text-[10px] uppercase font-bold text-ink-secondary">City</Label>
+                    <input 
                       id="city" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-3.5 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
                       placeholder="Mumbai" 
                       {...form1.register("city")} 
                     />
-                    {form1.formState.errors.city && <p className="text-xs text-red-650">{form1.formState.errors.city.message}</p>}
+                    {form1.formState.errors.city && <p className="text-xs text-danger mt-1">{form1.formState.errors.city.message as string}</p>}
                   </div>
 
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="state" className="text-slate-600 font-semibold">State</Label>
-                    <Input 
-                      id="state" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
-                      placeholder="Maharashtra" 
-                      {...form1.register("state")} 
-                    />
-                    {form1.formState.errors.state && <p className="text-xs text-red-650">{form1.formState.errors.state.message}</p>}
+                  <div className="space-y-1">
+                    <Label htmlFor="state" className="text-[10px] uppercase font-bold text-ink-secondary">State</Label>
+                    <Select
+                      value={form1.watch("state") || ""}
+                      onValueChange={(val) => form1.setValue("state", val || "", { shouldValidate: true })}
+                    >
+                      <SelectTrigger className="w-full bg-cream-50 text-ink-primary h-11 border-none shadow-soft rounded-button px-3.5 py-2.5 text-xs font-semibold focus:ring-2 focus:ring-brand-500/20 transition-all justify-between">
+                        <SelectValue placeholder="Select" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white border border-surface-border rounded-xl shadow-floating max-h-56 z-50">
+                        {INDIAN_STATES.map((st) => (
+                          <SelectItem key={st} value={st} className="cursor-pointer text-xs py-1.5">
+                            {st}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {form1.formState.errors.state && <p className="text-xs text-danger mt-1">{form1.formState.errors.state.message as string}</p>}
                   </div>
 
-                  <div className="col-span-1 space-y-2">
-                    <Label htmlFor="pincode" className="text-slate-600 font-semibold">Pincode</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="pincode" className="text-[10px] uppercase font-bold text-ink-secondary">Pincode</Label>
+                    <input 
                       id="pincode" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                      className="w-full bg-cream-50 rounded-button px-3.5 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
                       placeholder="400001" 
                       {...form1.register("pincode")} 
                     />
-                    {form1.formState.errors.pincode && <p className="text-xs text-red-650">{form1.formState.errors.pincode.message}</p>}
+                    {form1.formState.errors.pincode && <p className="text-xs text-danger mt-1">{form1.formState.errors.pincode.message as string}</p>}
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-end border-t border-slate-100 mt-6 pt-6">
+              <CardFooter className="flex justify-end border-t border-surface-border/50 mt-6 pt-6">
                 <Button 
                   type="submit" 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm gap-2"
                   disabled={saving}
                 >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save & Continue"}
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save & Continue"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </CardFooter>
@@ -461,68 +467,67 @@ export default function OnboardingPage() {
           {/* STEP 2: TAX & LEGAL */}
           {currentStep === 2 && (
             <form onSubmit={form2.handleSubmit(onStep2Submit)}>
-              <CardHeader>
+              <CardHeader className="border-b border-surface-border/50 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-650">
+                  <div className="p-2.5 rounded-lg bg-brand-50 text-brand-600">
                     <Percent className="w-5 h-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-slate-900 font-bold">Tax & Legal Info</CardTitle>
-                    <CardDescription className="text-slate-500">These will appear on tax invoices. (Optional)</CardDescription>
+                    <CardTitle className="text-lg text-ink-black font-bold uppercase tracking-wider">Tax & Legal Info</CardTitle>
+                    <CardDescription className="text-ink-secondary text-[10px]">These fields will print on client invoices. (Optional)</CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="gstin" className="text-slate-600 font-semibold">GSTIN Number (15 Characters)</Label>
-                  <Input 
+              <CardContent className="space-y-4 pt-6">
+                <div className="space-y-1">
+                  <Label htmlFor="gstin" className="text-[10px] uppercase font-bold text-ink-secondary">GSTIN Number (Optional)</Label>
+                  <input 
                     id="gstin" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
                     placeholder="27AAAAA1111A1Z1" 
                     {...form2.register("gstin")} 
                   />
-                  {form2.formState.errors.gstin && <p className="text-xs text-red-655">{form2.formState.errors.gstin.message}</p>}
+                  {form2.formState.errors.gstin && <p className="text-xs text-danger mt-1">{form2.formState.errors.gstin.message as string}</p>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="pan" className="text-slate-600 font-semibold">PAN Number (10 Characters)</Label>
-                  <Input 
+                <div className="space-y-1">
+                  <Label htmlFor="pan" className="text-[10px] uppercase font-bold text-ink-secondary">PAN Number (Optional)</Label>
+                  <input 
                     id="pan" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
                     placeholder="ABCDE1234F" 
                     {...form2.register("pan")} 
                   />
-                  {form2.formState.errors.pan && <p className="text-xs text-red-655">{form2.formState.errors.pan.message}</p>}
+                  {form2.formState.errors.pan && <p className="text-xs text-danger mt-1">{form2.formState.errors.pan.message as string}</p>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="invoice_prefix" className="text-slate-600 font-semibold">Invoice Number Prefix (Default: INV)</Label>
-                  <Input 
+                <div className="space-y-1">
+                  <Label htmlFor="invoice_prefix" className="text-[10px] uppercase font-bold text-ink-secondary">Invoice Number Prefix</Label>
+                  <input 
                     id="invoice_prefix" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
                     placeholder="INV" 
                     {...form2.register("invoice_prefix")} 
                   />
-                  {form2.formState.errors.invoice_prefix && <p className="text-xs text-red-655">{form2.formState.errors.invoice_prefix.message}</p>}
-                  <p className="text-xs text-slate-450">For example: CB, IND, INV. Max 6 characters.</p>
+                  {form2.formState.errors.invoice_prefix && <p className="text-xs text-danger mt-1">{form2.formState.errors.invoice_prefix.message as string}</p>}
+                  <p className="text-[10px] text-ink-secondary italic mt-1">E.g., INV, AG, TR. Maximum 6 characters.</p>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t border-slate-100 mt-6 pt-6">
+              <CardFooter className="flex justify-between border-t border-surface-border/50 mt-6 pt-6">
                 <Button 
                   type="button" 
                   variant="outline" 
-                  className="border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
                   onClick={() => setCurrentStep(1)}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
+                
                 <Button 
                   type="submit" 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm gap-2"
                   disabled={saving}
                 >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save & Continue"}
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save & Continue"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </CardFooter>
@@ -532,80 +537,81 @@ export default function OnboardingPage() {
           {/* STEP 3: PAYMENT DETAILS */}
           {currentStep === 3 && (
             <form onSubmit={form3.handleSubmit(onStep3Submit)}>
-              <CardHeader>
+              <CardHeader className="border-b border-surface-border/50 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-650">
+                  <div className="p-2.5 rounded-lg bg-brand-50 text-brand-600">
                     <CreditCard className="w-5 h-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-slate-900 font-bold">Payment Details</CardTitle>
-                    <CardDescription className="text-slate-500">These details will appear on your client's payment portal.</CardDescription>
+                    <CardTitle className="text-lg text-ink-black font-bold uppercase tracking-wider">Payment Settings</CardTitle>
+                    <CardDescription className="text-ink-secondary text-[10px]">
+                      Configure gateway routes. (Fully optional during onboarding, can be skipped)
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="upi_id" className="text-slate-600 font-semibold">UPI ID (e.g. dynamic-upi@okhdfcbank)</Label>
-                  <Input 
+              <CardContent className="space-y-4 pt-6">
+                <div className="space-y-1">
+                  <Label htmlFor="upi_id" className="text-[10px] uppercase font-bold text-ink-secondary">UPI ID handle (Optional)</Label>
+                  <input 
                     id="upi_id" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
                     placeholder="mybusiness@okaxis" 
                     {...form3.register("upi_id")} 
                   />
-                  {form3.formState.errors.upi_id && <p className="text-xs text-red-655">{form3.formState.errors.upi_id.message}</p>}
+                  {form3.formState.errors.upi_id && <p className="text-xs text-danger mt-1">{form3.formState.errors.upi_id.message as string}</p>}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="bank_name" className="text-slate-600 font-semibold">Bank Name</Label>
-                  <Input 
+                <div className="space-y-1">
+                  <Label htmlFor="bank_name" className="text-[10px] uppercase font-bold text-ink-secondary">Bank Name (Optional)</Label>
+                  <input 
                     id="bank_name" 
-                    className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
-                    placeholder="HDFC Bank" 
+                    className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
+                    placeholder="e.g. ICICI Bank" 
                     {...form3.register("bank_name")} 
                   />
-                  {form3.formState.errors.bank_name && <p className="text-xs text-red-655">{form3.formState.errors.bank_name.message}</p>}
+                  {form3.formState.errors.bank_name && <p className="text-xs text-danger mt-1">{form3.formState.errors.bank_name.message as string}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="account_number" className="text-slate-600 font-semibold">Account Number</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="account_number" className="text-[10px] uppercase font-bold text-ink-secondary">Account Number (Optional)</Label>
+                    <input 
                       id="account_number" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
-                      placeholder="50100012345678" 
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono"
+                      placeholder="Account number" 
                       {...form3.register("account_number")} 
                     />
-                    {form3.formState.errors.account_number && <p className="text-xs text-red-655">{form3.formState.errors.account_number.message}</p>}
+                    {form3.formState.errors.account_number && <p className="text-xs text-danger mt-1">{form3.formState.errors.account_number.message as string}</p>}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ifsc_code" className="text-slate-600 font-semibold">IFSC Code</Label>
-                    <Input 
+                  <div className="space-y-1">
+                    <Label htmlFor="ifsc_code" className="text-[10px] uppercase font-bold text-ink-secondary">IFSC Code (Optional)</Label>
+                    <input 
                       id="ifsc_code" 
-                      className="bg-white border-slate-200 text-slate-900 focus-visible:ring-indigo-600 focus-visible:border-slate-350"
-                      placeholder="HDFC0000001" 
+                      className="w-full bg-cream-50 rounded-button px-4 py-3 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all font-mono uppercase"
+                      placeholder="e.g. ICIC0000001" 
                       {...form3.register("ifsc_code")} 
                     />
-                    {form3.formState.errors.ifsc_code && <p className="text-xs text-red-655">{form3.formState.errors.ifsc_code.message}</p>}
+                    {form3.formState.errors.ifsc_code && <p className="text-xs text-danger mt-1">{form3.formState.errors.ifsc_code.message as string}</p>}
                   </div>
                 </div>
               </CardContent>
-              <CardFooter className="flex justify-between border-t border-slate-100 mt-6 pt-6">
+              <CardFooter className="flex justify-between border-t border-surface-border/50 mt-6 pt-6">
                 <Button 
                   type="button" 
                   variant="outline" 
-                  className="border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
                   onClick={() => setCurrentStep(2)}
                 >
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
                 </Button>
+                
                 <Button 
                   type="submit" 
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-sm gap-2"
                   disabled={saving}
                 >
-                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save & Finish"}
+                  {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save & Finish"}
                   <ArrowRight className="w-4 h-4" />
                 </Button>
               </CardFooter>
@@ -615,29 +621,28 @@ export default function OnboardingPage() {
           {/* STEP 4: SUCCESS */}
           {currentStep === 4 && (
             <div className="text-center p-8 space-y-6">
-              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-650 animate-pulse">
-                <CheckCircle2 className="w-12 h-12" />
+              <div className="w-20 h-20 mx-auto rounded-full bg-success-light border border-success/20 flex items-center justify-center text-success-dark animate-pulse">
+                <CheckCircle2 className="w-10 h-10" />
               </div>
               <div className="space-y-2">
-                <h2 className="text-2xl font-bold text-slate-900 flex items-center justify-center gap-2">
-                  You're all set! <Sparkles className="w-5 h-5 text-indigo-600" />
+                <h2 className="text-2xl font-bold text-ink-black flex items-center justify-center gap-2">
+                  You're all set! <Sparkles className="w-5 h-5 text-brand-600" />
                 </h2>
-                <p className="text-slate-500 max-w-sm mx-auto text-sm">
-                  Your business profile has been completed. Now you're ready to collect payments automatically!
+                <p className="text-ink-secondary max-w-sm mx-auto text-xs font-semibold leading-relaxed">
+                  Your business onboarding has completed. Now you're ready to automate invoice billing and clearing!
                 </p>
               </div>
 
               <div className="flex flex-col gap-3 max-w-xs mx-auto pt-4">
-                <Button 
+                <button 
                   onClick={() => router.push("/invoices/new")} 
-                  className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white rounded-xl shadow-sm"
+                  className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3.5 rounded-button text-xs transition-all shadow-soft border-none cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   Create Your First Invoice
-                </Button>
+                </button>
                 <Button 
-                  variant="ghost" 
                   onClick={completeOnboarding} 
-                  className="w-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl"
+                  className="w-full"
                 >
                   Go to Dashboard
                 </Button>
@@ -648,8 +653,8 @@ export default function OnboardingPage() {
       </div>
 
       {/* Footer */}
-      <div className="w-full max-w-xl mx-auto text-center mt-8 text-xs text-slate-400 z-10">
-        © {new Date().getFullYear()} CollectBot. Secure payment collection.
+      <div className="w-full max-w-xl mx-auto text-center mt-8 text-[10px] text-ink-muted uppercase tracking-wider font-bold z-10">
+        © {new Date().getFullYear()} CollectBot Secure Workspace Onboarding.
       </div>
     </div>
   )

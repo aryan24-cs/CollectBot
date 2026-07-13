@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const { data: business, error } = await supabase
       .from("businesses")
-      .select("*")
+      .select("*, subscriptions(*)")
       .eq("user_id", user.id)
       .maybeSingle()
 
@@ -22,7 +22,23 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Business profile not found" }, { status: 404 })
     }
 
-    return NextResponse.json(business)
+    const sub = business.subscriptions?.[0] || null
+    const responseData = { ...business }
+    delete responseData.subscriptions
+    
+    responseData.subscription = sub ? {
+      plan: sub.plan_name || sub.plan || "free",
+      billing_cycle: sub.billing_cycle || "monthly",
+      status: sub.status || "active",
+      current_period_end: sub.current_period_end || new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    } : {
+      plan: "free",
+      billing_cycle: "monthly",
+      status: "active",
+      current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    }
+
+    return NextResponse.json(responseData)
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to load profile settings." }, { status: 500 })
   }
