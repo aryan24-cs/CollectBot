@@ -137,17 +137,70 @@ export async function middleware(request: NextRequest) {
     path.startsWith('/settings')
     
   if (isDashboardRoute) {
+    // 1. Check if owner
     const { data: business } = await supabase
       .from('businesses')
       .select('id, name')
       .eq('user_id', user.id)
       .maybeSingle()
     
+    let userRole = 'OWNER'
+
     if (!business) {
-      // No business setup — force onboarding
-      return NextResponse.redirect(
-        new URL('/onboarding', request.url)
-      )
+      // 2. Check if employee
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id, status, employee_type')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (!employee) {
+        // No business setup — force onboarding
+        return NextResponse.redirect(
+          new URL('/onboarding', request.url)
+        )
+      }
+
+      if (employee.status === 'suspended') {
+        // Suspended employees are blocked from accessing the workspace
+        return NextResponse.redirect(
+          new URL('/login?error=suspended', request.url)
+        )
+      }
+
+      userRole = employee.employee_type || 'FINANCE'
+    }
+
+    // Redirect to correct dashboard on generic /dashboard landing
+    if (path === '/dashboard') {
+      if (userRole === 'FINANCE') {
+        return NextResponse.redirect(new URL('/dashboard/finance', request.url))
+      }
+      if (userRole === 'SALES') {
+        return NextResponse.redirect(new URL('/dashboard/sales', request.url))
+      }
+      if (userRole === 'MARKETING') {
+        return NextResponse.redirect(new URL('/dashboard/marketing', request.url))
+      }
+    }
+
+    // Protect workspaces paths
+    const financePaths = ['/invoices', '/expenses', '/approvals', '/reminders', '/api/invoices', '/api/payments', '/api/expenses', '/api/approvals']
+    const salesPaths = ['/dashboard/sales', '/api/sales']
+    const marketingPaths = ['/dashboard/marketing', '/api/marketing']
+
+    const isFinancePath = financePaths.some(p => path.startsWith(p))
+    const isSalesPath = salesPaths.some(p => path.startsWith(p))
+    const isMarketingPath = marketingPaths.some(p => path.startsWith(p))
+
+    if (isFinancePath && userRole !== 'OWNER' && userRole !== 'FINANCE') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    if (isSalesPath && userRole !== 'OWNER' && userRole !== 'SALES') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
+    }
+    if (isMarketingPath && userRole !== 'OWNER' && userRole !== 'MARKETING') {
+      return NextResponse.redirect(new URL('/dashboard', request.url))
     }
   }
   

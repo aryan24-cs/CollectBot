@@ -260,3 +260,45 @@ export async function sendClientAddedEmail({ to, clientName, businessName }: { t
   })
   console.log(`Client added email sent to client ${to} for business ${businessName}`)
 }
+
+export async function sendEmployeeInvitationEmail({
+  to,
+  employeeName,
+  businessName,
+  inviteLink
+}: {
+  to: string
+  employeeName: string
+  businessName: string
+  inviteLink: string
+}) {
+  const subject = `Invitation to join ${businessName} on CollectBot 💼`
+  const htmlContent = `
+    <div style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #1a1a1a; max-width: 550px; margin: 0 auto; border: 1px solid #eee9e4; border-radius: 16px; background-color: #FAF8F5;">
+      <h2 style="color: #0A0A0A; margin-top: 0; font-family: sans-serif; font-weight: 800; tracking: tight;">Join the Team!</h2>
+      <p>Hello ${employeeName},</p>
+      <p>You have been invited by the Business Owner of <strong>${businessName}</strong> to join their workspace workspace as an employee on CollectBot.</p>
+      <p>Click the link below to accept the invitation, set your account password, and gain access to your assigned workspace modules:</p>
+      
+      <p style="text-align: center; margin-top: 25px; margin-bottom: 25px;">
+        <a href="${inviteLink}" style="background-color: #E91E63; color: white; padding: 12px 24px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 13px; box-shadow: 0 4px 10px rgba(233, 30, 99, 0.2);">Accept Invitation & Set Password</a>
+      </p>
+
+      <p style="font-size: 11px; color: #666; word-break: break-all;">Or copy and paste this link in your browser:<br/>
+        <a href="${inviteLink}" style="color: #E91E63;">${inviteLink}</a>
+      </p>
+      
+      <p>If you did not expect this invitation, you can safely ignore this email.</p>
+      <hr style="border: 0; border-top: 1px solid #eee9e4; margin: 20px 0;" />
+      <span style="font-size: 10px; color: #9B9B9B;">Sent with care from the CollectBot Team.</span>
+    </div>
+  `
+  await transporter.sendMail({
+    from: FROM_EMAIL,
+    to,
+    subject,
+    html: htmlContent,
+  })
+  console.log(`Employee invitation email sent successfully to ${to}`)
+}
+

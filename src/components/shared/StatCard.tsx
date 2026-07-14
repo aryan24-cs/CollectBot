@@ -15,6 +15,7 @@ interface StatCardProps {
   isDark?: boolean
   className?: string
   onClick?: () => void
+  icon?: React.ReactNode
 }
 
 export default function StatCard({
@@ -24,13 +25,14 @@ export default function StatCard({
   trend,
   isDark = false,
   className,
-  onClick
+  onClick,
+  icon
 }: StatCardProps) {
   return (
     <div
       onClick={onClick}
       className={cn(
-        "rounded-card p-6 shadow-card transition-all duration-200 border border-surface-border/50",
+        "rounded-card p-6 shadow-card duration-200 border border-surface-border/50",
         isDark 
           ? "bg-[#1A1A1A] text-white hover:bg-[#252525]" 
           : "bg-surface-white text-ink-primary hover:shadow-card-hover hover:-translate-y-0.5",
@@ -46,17 +48,20 @@ export default function StatCard({
         )}>
           {title}
         </span>
-        {trend && (
-          <div className={cn(
-            "flex items-center gap-0.5 px-2 py-0.5 rounded-pill text-[10px] font-bold shadow-soft",
-            trend.isPositive 
-              ? (isDark ? "bg-success text-success-light" : "bg-success-light text-success-dark")
-              : (isDark ? "bg-danger text-danger-light" : "bg-danger-light text-danger-dark")
-          )}>
-            {trend.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-            {trend.value}
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          {trend && (
+            <div className={cn(
+              "flex items-center gap-0.5 px-2 py-0.5 rounded-pill text-[10px] font-bold shadow-soft",
+              trend.isPositive 
+                ? (isDark ? "bg-success text-success-light" : "bg-success-light text-success-dark")
+                : (isDark ? "bg-danger text-danger-light" : "bg-danger-light text-danger-dark")
+            )}>
+              {trend.isPositive ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+              {trend.value}
+            </div>
+          )}
+          {icon}
+        </div>
       </div>
 
       {/* Main value */}

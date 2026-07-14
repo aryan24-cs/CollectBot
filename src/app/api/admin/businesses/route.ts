@@ -21,16 +21,14 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from("businesses")
       .select(
-        `id, name, email, phone, city, state, created_at, updated_at,
+        `id, name, created_at, updated_at,
          subscriptions(plan_name, status, trial_ends_at, current_period_end)`,
         { count: "exact" }
       )
 
     // Search filter
     if (search) {
-      query = query.or(
-        `name.ilike.%${search}%,email.ilike.%${search}%,phone.ilike.%${search}%`
-      )
+      query = query.ilike("name", `%${search}%`)
     }
 
     // Sort

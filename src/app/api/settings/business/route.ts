@@ -1,30 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
 import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { error: authError, user, business, employee } = await requireBusinessUser(request)
+    if (authError) return authError
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business, error } = await supabase
-      .from("businesses")
-      .select("*, subscriptions(*)")
-      .eq("user_id", user.id)
+    const adminDb = getSupabaseServiceRoleClient()
+    const subRes = await adminDb
+      .from("subscriptions")
+      .select("*")
+      .eq("business_id", business!.id)
       .maybeSingle()
 
-    if (error) throw error
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 404 })
-    }
-
-    const sub = business.subscriptions?.[0] || null
-    const responseData = { ...business }
-    delete responseData.subscriptions
+    const sub = subRes.data || null
+    const responseData: any = { ...business }
     
     responseData.subscription = sub ? {
       plan: sub.plan_name || sub.plan || "free",
@@ -36,6 +28,46 @@ export async function GET(request: NextRequest) {
       billing_cycle: "monthly",
       status: "active",
       current_period_end: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString()
+    }
+
+    // Load active user permission credentials
+    if (!employee) {
+      responseData.isOwner = true
+      responseData.permissions = ["all"]
+    } else {
+      responseData.isOwner = false
+      
+      // Fetch role permissions
+      let rolePerms: any[] = []
+      if (employee.custom_role_id) {
+        const { data: rp } = await adminDb
+          .from("role_permissions")
+          .select("category, action")
+          .eq("role_id", employee.custom_role_id)
+        rolePerms = rp || []
+      }
+
+      // Fetch direct employee permissions overrides
+      const { data: ep } = await adminDb
+        .from("employee_permissions")
+        .select("category, action")
+        .eq("employee_id", employee.id)
+      const empPerms = ep || []
+
+      // Merge unique permissions
+      const permSet = new Set<string>()
+      rolePerms.forEach((p: any) => permSet.add(`${p.category}:${p.action}`))
+      empPerms.forEach((p: any) => permSet.add(`${p.category}:${p.action}`))
+
+      responseData.permissions = Array.from(permSet)
+      responseData.employee = {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        custom_role_id: employee.custom_role_id,
+        department_id: employee.department_id,
+        employee_type: employee.employee_type,
+      }
     }
 
     return NextResponse.json(responseData)

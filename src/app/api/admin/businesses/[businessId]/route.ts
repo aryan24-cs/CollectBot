@@ -16,7 +16,11 @@ export async function GET(
     // Fetch business with related data
     const [businessRes, invoiceRes, paymentRes, clientRes, subscriptionRes, overrideRes] =
       await Promise.all([
-        supabase.from("businesses").select("*").eq("id", businessId).single(),
+        supabase
+          .from("businesses")
+          .select("id, name, logo_url, created_at, updated_at, invoice_prefix, invoice_counter")
+          .eq("id", businessId)
+          .single(),
         supabase
           .from("invoices")
           .select("id, total, status, created_at", { count: "exact" })

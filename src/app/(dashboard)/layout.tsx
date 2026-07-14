@@ -28,14 +28,33 @@ export default async function DashboardLayout({
     redirect("/admin/overview")
   }
 
-  // Fetch business profile to check if onboarded
-  const { data: business } = await supabase
+  // Fetch business profile to check if onboarded (support direct owners and employees)
+  let business = null
+  let employee = null
+
+  const { data: directBusiness } = await supabase
     .from("businesses")
     .select("id, name, logo_url, email")
     .eq("user_id", user.id)
     .maybeSingle()
 
-  // If user has not completed onboarding, redirect to /onboarding
+  if (directBusiness) {
+    business = directBusiness
+  } else {
+    const { data: empRecord } = await supabase
+      .from("employees")
+      .select("id, status, business:businesses(id, name, logo_url, email)")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .maybeSingle()
+
+    if (empRecord && empRecord.business) {
+      business = empRecord.business as any
+      employee = empRecord
+    }
+  }
+
+  // If user has not completed onboarding and is not an invited employee, redirect to /onboarding
   if (!business) {
     redirect("/onboarding")
   }

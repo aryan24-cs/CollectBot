@@ -37,24 +37,49 @@ export async function requireBusinessUser(request: Request) {
     }
   }
   
-  const { data: business } = await supabase
+  let business = null
+  let employee = null
+
+  // 1. Check if direct business owner
+  const { data: directBusiness } = await supabase
     .from("businesses")
     .select("*")
     .eq("user_id", user.id)
     .maybeSingle()
+
+  if (directBusiness) {
+    business = directBusiness
+  } else {
+    // 2. Check if active employee linked to a business
+    const { data: empRecord } = await supabase
+      .from("employees")
+      .select("*, business:businesses(*)")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .maybeSingle()
+
+    if (empRecord && empRecord.business) {
+      business = empRecord.business
+      employee = empRecord
+    }
+  }
   
   if (!business) {
     return {
       error: NextResponse.json(
-        { error: "Business not found" }, 
+        { error: "Business not found or access denied" }, 
         { status: 404 }
       ),
       user: null,
-      business: null
+      business: null,
+      employee: null,
+      role: null
     }
   }
   
-  return { error: null, user, business }
+  const role = directBusiness ? 'OWNER' : (employee?.employee_type || 'FINANCE')
+  
+  return { error: null, user, business, employee, role }
 }
 
 export async function requireAdmin(request: Request) {

@@ -1,6 +1,8 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
+
 import { 
   Building2, 
   FileText, 
@@ -450,6 +452,33 @@ export default function SettingsPage() {
               </button>
             )
           })}
+
+          <div className="h-px bg-[#EEE9E4] my-2" />
+          <p className="text-[9px] uppercase font-bold text-ink-muted px-3 py-1">Advanced Settings</p>
+          
+          <Link
+            href="/settings/employees"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-ink-secondary hover:text-ink-primary hover:bg-cream-50 transition-all border-none"
+          >
+            <Users className="w-4 h-4 text-ink-secondary" />
+            <span>Teammates Override</span>
+          </Link>
+          
+          <Link
+            href="/settings/departments"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-cream-50 transition-all border-none"
+          >
+            <Building2 className="w-4 h-4 text-ink-secondary" />
+            <span>Departments</span>
+          </Link>
+
+          <Link
+            href="/settings/roles"
+            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-cream-50 transition-all border-none"
+          >
+            <Lock className="w-4 h-4 text-ink-secondary" />
+            <span>Roles & RBAC Matrix</span>
+          </Link>
         </div>
 
         {/* Form panel content */}
