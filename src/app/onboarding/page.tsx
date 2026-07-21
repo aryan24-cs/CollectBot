@@ -144,6 +144,24 @@ export default function OnboardingPage() {
           return
         }
 
+        // Check if user is an employee — employees NEVER go through business onboarding!
+        try {
+          const profileRes = await fetch("/api/settings/business")
+          if (profileRes.ok) {
+            const profileData = await profileRes.json()
+            if (profileData.isOwner === false) {
+              const empType = profileData.employee?.employee_type
+              const targetDashboard = 
+                empType === "FINANCE" ? "/dashboard/finance" :
+                empType === "SALES" ? "/dashboard/sales" :
+                empType === "MARKETING" ? "/dashboard/marketing" :
+                "/dashboard"
+              router.push(targetDashboard)
+              return
+            }
+          }
+        } catch (_) {}
+
         // Fetch user's business
         const { data: business, error } = await supabase
           .from("businesses")

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { requireBusinessUser } from "@/lib/auth/checkRole"
 
@@ -8,7 +7,7 @@ export async function GET(request: NextRequest) {
   if (error) return error
 
   try {
-    const supabase = await getSupabaseServerClient()
+    const supabase = getSupabaseServiceRoleClient()
     const { data: departments, error: depError } = await supabase
       .from("departments")
       .select("*")

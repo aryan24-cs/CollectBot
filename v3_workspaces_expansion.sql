@@ -8,7 +8,7 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP WITH TIME ZO
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS created_by UUID;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS updated_by UUID;
 
--- 2. Create employee_profiles table
+-- 2. Create employee_profiles table 
 CREATE TABLE IF NOT EXISTS employee_profiles (
   id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   employee_id   UUID REFERENCES employees(id) ON DELETE CASCADE,
@@ -172,11 +172,12 @@ CREATE TABLE IF NOT EXISTS marketing_templates (
   subject       TEXT,
   body_content  TEXT NOT NULL,
   created_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW(), 
   deleted_at    TIMESTAMP WITH TIME ZONE,
   created_by    UUID,
   updated_by    UUID
 );
+
 
 -- 13. Create marketing_contacts table
 CREATE TABLE IF NOT EXISTS marketing_contacts (

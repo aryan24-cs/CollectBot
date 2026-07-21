@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 
 export async function GET(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const supabase = getSupabaseServiceRoleClient()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // 1. Fetch user's business
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
-
-    // 2. Fetch all logs for statistics calculation
+    // 1. Fetch all logs for statistics calculation
     const { data: logs, error: logsError } = await supabase
       .from("reminder_logs")
       .select(`
@@ -74,7 +62,7 @@ export async function GET(request: NextRequest) {
       })
     })
 
-    // 3. Fetch active invoices to compute upcoming schedule
+    // 2. Fetch active invoices to compute upcoming schedule
     const { data: invoices, error: invError } = await supabase
       .from("invoices")
       .select(`
@@ -100,8 +88,8 @@ export async function GET(request: NextRequest) {
 
     invoices?.forEach((inv: any) => {
       const businessRaw = inv.business
-      const business = Array.isArray(businessRaw) ? businessRaw[0] : businessRaw
-      const rawSettings = business?.notification_settings
+      const bizObj = Array.isArray(businessRaw) ? businessRaw[0] : businessRaw
+      const rawSettings = bizObj?.notification_settings
       const settings = Array.isArray(rawSettings) ? rawSettings[0] : rawSettings
 
       const milestones = [

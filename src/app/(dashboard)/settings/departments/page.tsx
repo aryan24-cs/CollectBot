@@ -346,7 +346,7 @@ export default function DepartmentsSettingsPage() {
 
       {/* Edit Department Details Dialog */}
       <Dialog open={!!editingDept} onOpenChange={(open) => !open && setEditingDept(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-lg rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black">Edit Department Details</DialogTitle>
           </DialogHeader>
@@ -394,7 +394,7 @@ export default function DepartmentsSettingsPage() {
 
       {/* Merge Segment Dialog */}
       <Dialog open={!!mergingDept} onOpenChange={(open) => !open && setMergingDept(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-lg rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black flex items-center gap-1.5">
               <GitMerge className="w-5 h-5 text-[#E91E63]" />

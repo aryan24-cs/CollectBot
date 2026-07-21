@@ -21,26 +21,22 @@ export default function AdminTopBar() {
   const [searchValue, setSearchValue] = React.useState("")
 
   React.useEffect(() => {
-    async function loadAdminUser() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const name = user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin"
-          setAdminName(name)
-          const init = name
-            .split(" ")
-            .map((n: string) => n[0])
-            .join("")
-            .toUpperCase()
-            .slice(0, 2)
-          setInitials(init)
-        }
-      } catch (err) {
-        console.warn("AdminTopBar: Could not load user session:", err)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const user = session.user
+        const name = user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin"
+        setAdminName(name)
+        const init = name
+          .split(" ")
+          .map((n: string) => n[0])
+          .join("")
+          .toUpperCase()
+          .slice(0, 2)
+        setInitials(init)
       }
-    }
-    loadAdminUser()
-  }, [])
+    })
+    return () => subscription.unsubscribe()
+  }, [supabase])
 
   const handleLogout = async () => {
     try {

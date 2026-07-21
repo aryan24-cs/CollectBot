@@ -388,7 +388,7 @@ export default function MarketingWorkspacePage() {
 
       {/* Add Campaign Modal */}
       <Dialog open={isCampaignOpen} onOpenChange={setIsCampaignOpen}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-2xl rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black flex items-center gap-1">
               <Sparkles className="w-5 h-5 text-[#E91E63]" />
@@ -493,7 +493,7 @@ export default function MarketingWorkspacePage() {
 
       {/* Add Coupon Modal */}
       <Dialog open={isCouponOpen} onOpenChange={setIsCouponOpen}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-sm rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black flex items-center gap-1">
               <Tag className="w-5 h-5 text-[#E91E63]" />

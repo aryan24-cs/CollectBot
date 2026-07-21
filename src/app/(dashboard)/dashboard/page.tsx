@@ -101,35 +101,26 @@ export default function DashboardPage() {
         return
       }
 
-      // Check if user is employee first - if so, redirect them (middleware handles this too but extra safety is key)
-      const { data: employeeCheck } = await supabase
-        .from("employees")
-        .select("id, employee_type, status")
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      if (employeeCheck) {
-        if (employeeCheck.status === "suspended") {
-          router.push("/login?error=suspended")
+      let biz: any = null
+      // Check user profile via backend API (bypasses RLS)
+      const profileRes = await fetch("/api/settings/business")
+      if (profileRes.ok) {
+        const profileData = await profileRes.json()
+        if (profileData.isOwner === false) {
+          const empType = profileData.employee?.employee_type || "FINANCE"
+          const target = 
+            empType === "SALES" ? "/dashboard/sales" :
+            empType === "MARKETING" ? "/dashboard/marketing" :
+            "/dashboard/finance"
+          router.push(target)
           return
         }
-        const type = employeeCheck.employee_type || "FINANCE"
-        router.push(`/dashboard/${type.toLowerCase()}`)
-        return
-      }
-
-      // 1. Fetch Business Profile
-      const { data: biz } = await supabase
-        .from("businesses")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .maybeSingle()
-
-      if (!biz) {
+        biz = profileData
+        setBusinessName(profileData.name || "Workspace")
+      } else {
         router.push("/onboarding")
         return
       }
-      setBusinessName(biz.name)
 
       // 2. Fetch Invoices
       const { data: invoices, error: invError } = await supabase

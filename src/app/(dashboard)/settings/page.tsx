@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import Link from "next/link"
 
 import { 
   Building2, 
@@ -102,7 +101,7 @@ const INDIAN_STATES = [
 ]
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "team" | "plans">("profile")
+  const [activeTab, setActiveTab] = React.useState<"profile" | "invoice" | "payment" | "notifications" | "plans">("profile")
   
   // Data States
   const [business, setBusiness] = React.useState<BusinessProfile | null>(null)
@@ -383,7 +382,7 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-ink-black leading-tight">Settings</h1>
           <p className="text-ink-secondary text-sm">Manage business profile metadata, invoices counter, and UPI payment options.</p>
         </div>
-        {activeTab !== "notifications" && activeTab !== "team" && activeTab !== "plans" ? (
+        {activeTab !== "notifications" && activeTab !== "plans" ? (
           <button
             onClick={saveBusinessProfile}
             disabled={isSaving}
@@ -431,7 +430,6 @@ export default function SettingsPage() {
             { id: "invoice", label: "Invoice Settings", icon: FileText },
             { id: "payment", label: "Payment & Banking", icon: CreditCard },
             { id: "notifications", label: "Alert Schedules", icon: Bell },
-            { id: "team", label: "Team Members", icon: Users },
             { id: "plans", label: "Pricing & Plans", icon: Sparkles },
           ].map((tab) => {
             const Icon = tab.icon
@@ -452,33 +450,6 @@ export default function SettingsPage() {
               </button>
             )
           })}
-
-          <div className="h-px bg-[#EEE9E4] my-2" />
-          <p className="text-[9px] uppercase font-bold text-ink-muted px-3 py-1">Advanced Settings</p>
-          
-          <Link
-            href="/settings/employees"
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-ink-secondary hover:text-ink-primary hover:bg-cream-50 transition-all border-none"
-          >
-            <Users className="w-4 h-4 text-ink-secondary" />
-            <span>Teammates Override</span>
-          </Link>
-          
-          <Link
-            href="/settings/departments"
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-cream-50 transition-all border-none"
-          >
-            <Building2 className="w-4 h-4 text-ink-secondary" />
-            <span>Departments</span>
-          </Link>
-
-          <Link
-            href="/settings/roles"
-            className="w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-cream-50 transition-all border-none"
-          >
-            <Lock className="w-4 h-4 text-ink-secondary" />
-            <span>Roles & RBAC Matrix</span>
-          </Link>
         </div>
 
         {/* Form panel content */}
@@ -772,59 +743,6 @@ export default function SettingsPage() {
             </div>
           )}
 
-          {/* TAB 5: TEAM MEMBERS */}
-          {activeTab === "team" && (
-            <div className="space-y-6">
-              <Card>
-                <CardHeader className="border-b border-surface-border/50 pb-4">
-                  <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Invite Member</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <form onSubmit={handleInviteTeamMember} className="flex flex-col sm:flex-row gap-3">
-                    <input
-                      type="email"
-                      placeholder="teammate@example.com"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      className="w-full sm:flex-1 bg-cream-50 rounded-button px-4 py-2.5 text-xs font-semibold text-ink-primary focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft border-none transition-all"
-                    />
-                    <button
-                      type="submit"
-                      className="btn-primary px-5 py-2.5 rounded-button text-xs font-bold shrink-0"
-                    >
-                      Send Invite
-                    </button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              {team.length > 0 && (
-                <Card>
-                  <CardHeader className="border-b border-surface-border/50 pb-4">
-                    <CardTitle className="text-sm font-bold uppercase tracking-wider text-ink-black">Current Members</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6 p-0 divide-y divide-surface-border/50">
-                    {team.map((m) => (
-                      <div key={m.id} className="p-4 flex items-center justify-between hover:bg-cream-50/20 transition-colors">
-                        <div>
-                          <p className="text-xs font-bold text-ink-black">{m.email}</p>
-                          <p className="text-[10px] text-ink-secondary capitalize">{m.role} • {m.status}</p>
-                        </div>
-                        {m.role !== "owner" && (
-                          <button
-                            onClick={() => handleRemoveTeamMember(m.id, m.email)}
-                            className="p-2 rounded-full hover:bg-danger-light text-ink-secondary hover:text-danger-dark border-none bg-transparent cursor-pointer"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
 
           {/* TAB 6: PRICING & PLANS */}
           {activeTab === "plans" && (

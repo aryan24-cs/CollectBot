@@ -123,17 +123,17 @@ export default function EmployeesSettingsPage() {
   const [selectedPermissions, setSelectedPermissions] = React.useState<{category: string; action: string}[]>([])
 
   const loadData = async () => {
+    setIsLoading(true)
     try {
-      setIsLoading(true)
       const res = await fetch("/api/employees")
-      if (!res.ok) throw new Error("Failed to load workspace directory.")
       const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to load workspace directory.")
       setEmployees(data.employees || [])
       setDepartments(data.departments || [])
       setCustomRoles(data.customRoles || [])
       setBranches(data.branches || [])
     } catch (err: any) {
-      toast.error(err.message || "Failed to retrieve employee data.")
+      toast.error(err.message || "Failed to sync roster.")
     } finally {
       setIsLoading(false)
     }
@@ -460,7 +460,7 @@ export default function EmployeesSettingsPage() {
 
       {/* Invite/Create Teammate Modal Dialog */}
       <Dialog open={isInviteOpen} onOpenChange={setIsInviteOpen}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-lg rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary sm:max-w-2xl rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black">Add Teammate</DialogTitle>
             <DialogDescription className="text-ink-secondary text-xs mt-1.5">
@@ -611,7 +611,7 @@ export default function EmployeesSettingsPage() {
 
       {/* Reset Password Dialog */}
       <Dialog open={!!resettingEmployee} onOpenChange={(open) => !open && setResettingEmployee(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-sm rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary sm:max-w-lg rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black flex items-center gap-1.5">
               <Lock className="w-5 h-5 text-[#E91E63]" />
@@ -667,7 +667,7 @@ export default function EmployeesSettingsPage() {
 
       {/* Permissions Override Modal Dialog */}
       <Dialog open={!!editingEmployee} onOpenChange={(open) => !open && setEditingEmployee(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-4xl rounded-card shadow-floating z-50 overflow-hidden flex flex-col max-h-[85vh]">
+        <DialogContent className="bg-white border-surface-border text-ink-primary sm:max-w-4xl rounded-card shadow-floating z-50 overflow-hidden flex flex-col max-h-[85vh]">
           <DialogHeader className="px-6 pt-6">
             <DialogTitle className="text-lg font-bold text-ink-black flex items-center gap-1.5">
               <Key className="w-5 h-5 text-[#E91E63]" />
@@ -742,7 +742,7 @@ export default function EmployeesSettingsPage() {
 
       {/* Viewing Employee Profile / Analytics Dialog */}
       <Dialog open={!!viewingProfileEmployee} onOpenChange={(open) => !open && setViewingProfileEmployee(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-4xl rounded-card shadow-floating z-50 overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogContent className="bg-white border-surface-border text-ink-primary sm:max-w-4xl rounded-card shadow-floating z-50 overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader className="px-6 pt-6 border-b border-cream-200 pb-4">
             <div className="flex items-center gap-4">
               {viewingProfileEmployee?.profile_picture_url ? (

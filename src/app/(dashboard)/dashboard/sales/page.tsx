@@ -71,6 +71,10 @@ export default function SalesWorkspacePage() {
   const [movingLead, setMovingLead] = React.useState<Lead | null>(null)
   const [newStatus, setNewStatus] = React.useState<string>("")
 
+  const [currentEmployeeId, setCurrentEmployeeId] = React.useState<string | null>(null)
+  const [isOwner, setIsOwner] = React.useState(true)
+  const [leadScopeFilter, setLeadScopeFilter] = React.useState<"all" | "mine">("all")
+
   const loadLeads = async () => {
     try {
       setIsLoading(true)
@@ -83,6 +87,19 @@ export default function SalesWorkspacePage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const loadProfile = async () => {
+    try {
+      const res = await fetch("/api/settings/business")
+      if (res.ok) {
+        const data = await res.json()
+        setIsOwner(data.isOwner !== false)
+        if (data.employee?.id) {
+          setCurrentEmployeeId(data.employee.id)
+        }
+      }
+    } catch (_) {}
   }
 
   const loadEmployees = async () => {
@@ -98,6 +115,7 @@ export default function SalesWorkspacePage() {
   React.useEffect(() => {
     loadLeads()
     loadEmployees()
+    loadProfile()
   }, [])
 
   const handleAddSubmit = async (e: React.FormEvent) => {
@@ -180,7 +198,8 @@ export default function SalesWorkspacePage() {
     const matchesSearch = l.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (l.company && l.company.toLowerCase().includes(searchQuery.toLowerCase()))
     const matchesStage = stageFilter === "all" || l.status === stageFilter
-    return matchesSearch && matchesStage
+    const matchesScope = leadScopeFilter === "all" || (currentEmployeeId && l.assigned_to === currentEmployeeId)
+    return matchesSearch && matchesStage && matchesScope
   })
 
   // Calculations
@@ -271,28 +290,54 @@ export default function SalesWorkspacePage() {
 
       {/* Filter and Search actions */}
       <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-secondary/50" />
-          <input
-            placeholder="Search leads by name or company..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white rounded-pill border border-[#EEE9E4] pl-11 pr-6 py-3 text-xs text-ink-primary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft transition-all placeholder:text-ink-secondary/40"
-          />
+        <div className="flex items-center gap-2">
+          {/* Workload Scope Toggle */}
+          <div className="bg-white border border-[#EEE9E4] p-1 rounded-full flex items-center shadow-soft text-xs font-bold">
+            <button
+              onClick={() => setLeadScopeFilter("all")}
+              className={cn(
+                "px-4 py-1.5 rounded-full transition-all cursor-pointer",
+                leadScopeFilter === "all" ? "bg-[#1A1A1A] text-white shadow-sm" : "text-ink-secondary hover:text-ink-primary"
+              )}
+            >
+              All Business Pipeline
+            </button>
+            <button
+              onClick={() => setLeadScopeFilter("mine")}
+              className={cn(
+                "px-4 py-1.5 rounded-full transition-all cursor-pointer",
+                leadScopeFilter === "mine" ? "bg-[#E91E63] text-white shadow-sm" : "text-ink-secondary hover:text-ink-primary"
+              )}
+            >
+              My Assigned Deals
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-ink-secondary" />
-          <select
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            className="bg-white rounded-button border border-[#EEE9E4] text-xs font-semibold px-4 py-2.5 focus:outline-none text-ink-primary shadow-soft cursor-pointer flex-1 sm:flex-initial"
-          >
-            <option value="all">All Stages</option>
-            {PIPELINE_STAGES.map(stage => (
-              <option key={stage.id} value={stage.id}>{stage.label}</option>
-            ))}
-          </select>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-secondary/50" />
+            <input
+              placeholder="Search leads..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white rounded-pill border border-[#EEE9E4] pl-11 pr-6 py-2.5 text-xs text-ink-primary font-semibold focus:outline-none focus:ring-2 focus:ring-brand-500/20 shadow-soft transition-all placeholder:text-ink-secondary/40"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-4 h-4 text-ink-secondary" />
+            <select
+              value={stageFilter}
+              onChange={(e) => setStageFilter(e.target.value)}
+              className="bg-white rounded-button border border-[#EEE9E4] text-xs font-semibold px-4 py-2.5 focus:outline-none text-ink-primary shadow-soft cursor-pointer flex-1 sm:flex-initial"
+            >
+              <option value="all">All Stages</option>
+              {PIPELINE_STAGES.map(stage => (
+                <option key={stage.id} value={stage.id}>{stage.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -373,7 +418,7 @@ export default function SalesWorkspacePage() {
 
       {/* Add Lead Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-2xl rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black">Create CRM Lead</DialogTitle>
             <DialogDescription className="text-ink-secondary text-xs mt-1.5">
@@ -519,7 +564,7 @@ export default function SalesWorkspacePage() {
 
       {/* Shift Stage Modal */}
       <Dialog open={!!movingLead} onOpenChange={(open) => !open && setMovingLead(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-sm rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black">Shift Pipeline Stage</DialogTitle>
             <DialogDescription className="text-ink-secondary text-xs mt-1.5">

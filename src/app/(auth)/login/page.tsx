@@ -63,32 +63,31 @@ export default function LoginPage() {
         .eq("is_active", true)
         .maybeSingle()
 
-      // 3. Route accordingly
-      const isAdmin = !!adminUser || authData.user.email === "aryan.nda.2163@gmail.com"
+      // Determine instant zero-flash destination route via route-user API
+      try {
+        const routeRes = await fetch("/api/auth/route-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: authData.user.id,
+            email: authData.user.email,
+          }),
+        })
 
-      if (isAdmin) {
-        toast.success("Welcome back, Admin")
-        router.push("/admin/overview")
-      } else {
-        // Business user → check if onboarded
-        const { data: business, error: bizError } = await supabase
-          .from("businesses")
-          .select("id")
-          .eq("user_id", authData.user.id)
-          .maybeSingle()
-
-        if (bizError) {
-          throw new Error(`Auth successful, but checking business details failed: ${bizError.message}`)
+        const contentType = routeRes.headers.get("content-type") || ""
+        if (routeRes.ok && contentType.includes("application/json")) {
+          const routeData = await routeRes.json()
+          if (routeData.destination) {
+            toast.success("Welcome back")
+            router.push(routeData.destination)
+            router.refresh()
+            return
+          }
         }
+      } catch (_) {}
 
-        if (!business) {
-          toast.success("Login successful. Complete your setup.")
-          router.push("/onboarding")
-        } else {
-          toast.success("Welcome back")
-          router.push("/dashboard")
-        }
-      }
+      toast.success("Login successful")
+      router.push("/dashboard")
       router.refresh()
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.")

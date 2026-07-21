@@ -1,27 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { clientSchema } from "@/lib/validations/client"
 
 export async function POST(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get the user's business
-    const { data: business, error: bizError } = await supabase
-      .from("businesses")
-      .select("id, name")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (bizError || !business) {
-      return NextResponse.json({ error: "Business profile not found. Please complete onboarding first." }, { status: 400 })
-    }
-
     const body = await request.json()
     const validation = clientSchema.safeParse(body)
 
@@ -38,6 +24,8 @@ export async function POST(request: NextRequest) {
     } else if (cleanedPhone.startsWith("0")) {
       cleanedPhone = cleanedPhone.substring(1)
     }
+
+    const supabase = getSupabaseServiceRoleClient()
 
     const { data: client, error: insertError } = await supabase
       .from("clients")
@@ -89,25 +77,10 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get the user's business
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
-
     const searchParams = request.nextUrl.searchParams
     const search = searchParams.get("search") || ""
     const filter = searchParams.get("filter") || "all" // all, has_outstanding, overdue
@@ -117,6 +90,8 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get("sortOrder") || "asc"
 
     const offset = (page - 1) * limit
+
+    const supabase = getSupabaseServiceRoleClient()
 
     let query = supabase
       .from("clients")

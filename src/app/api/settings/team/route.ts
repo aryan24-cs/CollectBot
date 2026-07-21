@@ -1,27 +1,15 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { checkPlanLimit } from "@/lib/billing/planLimits"
 import { transporter } from "@/lib/email/client"
 
 export async function GET(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
-
+    const supabase = getSupabaseServiceRoleClient()
     const { data: members, error } = await supabase
       .from("team_members")
       .select("*")
@@ -37,26 +25,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const supabase = getSupabaseServiceRoleClient()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // 1. Get business profile
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id, name")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
-
-    // 2. Enforce subscription plan limits
+    // Enforce subscription plan limits
     const limitCheck = await checkPlanLimit(business.id, "add_team_member")
     if (!limitCheck.allowed) {
       return NextResponse.json(
@@ -84,7 +59,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User is already invited or a member of the team." }, { status: 400 })
     }
 
-    // 3. Create pending team member log
+    // Create pending team member log
     const { data: newMember, error: insertErr } = await supabase
       .from("team_members")
       .insert({
@@ -98,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     if (insertErr) throw insertErr
 
-    // 4. Send Invite Email via Nodemailer
+    // Send Invite Email via Nodemailer
     const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/register?invite=${newMember.id}`
     const FROM_EMAIL = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER || "CollectBot <billing@yourdomain.com>"
     
@@ -132,23 +107,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
+    const supabase = getSupabaseServiceRoleClient()
 
     const { searchParams } = new URL(request.url)
     const memberId = searchParams.get("id")

@@ -74,21 +74,17 @@ export default function FinanceDashboardPage() {
         return
       }
 
-      // Check if employee
-      const { data: empRecord } = await supabase
-        .from("employees")
-        .select("id, business_id, business:businesses(id, name)")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .maybeSingle()
-
-      if (!empRecord || !empRecord.business) {
+      let business: any = null
+      // Fetch profile via backend API (bypasses RLS)
+      const profileRes = await fetch("/api/settings/business")
+      if (profileRes.ok) {
+        const profileData = await profileRes.json()
+        business = profileData
+        setBusinessName(profileData.name || "Workspace")
+      } else {
         router.push("/onboarding")
         return
       }
-
-      const business = empRecord.business as any
-      setBusinessName(business.name)
 
       // Fetch Invoices
       const { data: invoices, error: invError } = await supabase

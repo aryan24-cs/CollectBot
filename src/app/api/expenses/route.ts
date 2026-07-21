@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { requireBusinessUser } from "@/lib/auth/checkRole"
 
@@ -8,17 +7,41 @@ export async function GET(request: NextRequest) {
   if (error) return error
 
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: expenses, error: expError } = await supabase
+    const supabase = getSupabaseServiceRoleClient()
+
+    // 1. Primary query with explicit foreign key relationship hint for PostgREST
+    let { data: expenses, error: expError } = await supabase
       .from("expenses")
-      .select("*, employee:employees(id, name)")
+      .select("*, employee:employees!employee_id(id, name)")
       .eq("business_id", business.id)
       .order("date", { ascending: false })
 
-    if (expError) throw expError
+    // 2. Fallback to manual join if relational embedding fails
+    if (expError) {
+      console.warn("Expenses FK join query failed, falling back to manual join:", expError.message)
+      const { data: rawExpenses, error: rawError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("business_id", business.id)
+        .order("date", { ascending: false })
 
-    return NextResponse.json(expenses)
+      if (rawError) throw rawError
+
+      const { data: employees } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("business_id", business.id)
+
+      const empMap = new Map((employees || []).map((e) => [e.id, e]))
+      expenses = (rawExpenses || []).map((exp) => ({
+        ...exp,
+        employee: exp.employee_id ? empMap.get(exp.employee_id) || null : null,
+      }))
+    }
+
+    return NextResponse.json(expenses || [])
   } catch (err: any) {
+    console.error("GET /api/expenses error:", err)
     return NextResponse.json({ error: err.message || "Failed to load expenses" }, { status: 500 })
   }
 }
@@ -37,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     const adminDb = getSupabaseServiceRoleClient()
 
-    // 1. Insert expense record. If logged by Owner, it's auto-approved. If employee, it starts as pending.
+    // If logged by Owner, it's auto-approved. If employee, it starts as pending.
     const isOwner = !employee
     const status = isOwner ? "approved" : "pending"
 
@@ -51,15 +74,15 @@ export async function POST(request: NextRequest) {
         date,
         description: description || null,
         status,
-        approved_by: isOwner ? null : null, // Set during approval
+        approved_by: isOwner ? null : null,
       })
       .select()
       .single()
 
     if (insertError) throw insertError
 
-    // 2. If employee logged it, register an approval request
-    if (!isOwner) {
+    // If employee logged it, register an approval request
+    if (!isOwner && employee) {
       const { data: approvalRequest, error: appError } = await adminDb
         .from("approval_requests")
         .insert({
@@ -72,16 +95,13 @@ export async function POST(request: NextRequest) {
         .select()
         .single()
 
-      if (appError) throw appError
-
-      // Create initial approval step
-      await adminDb
-        .from("approval_steps")
-        .insert({
+      if (!appError && approvalRequest) {
+        await adminDb.from("approval_steps").insert({
           approval_request_id: approvalRequest.id,
           step_order: 1,
           status: "pending",
         })
+      }
     }
 
     // Log activity
@@ -89,7 +109,7 @@ export async function POST(request: NextRequest) {
       business_id: business.id,
       type: "expense_created",
       description: `Logged expense of ${amount} for "${category}" (status: ${status}).`,
-      metadata: { expense_id: expense.id }
+      metadata: { expense_id: expense.id },
     })
 
     return NextResponse.json({ success: true, expense }, { status: 201 })

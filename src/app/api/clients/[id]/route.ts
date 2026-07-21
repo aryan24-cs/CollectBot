@@ -1,30 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { clientSchema } from "@/lib/validations/client"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const supabase = getSupabaseServiceRoleClient()
 
     // Fetch client details
     const { data: client, error: clientError } = await supabase
@@ -47,8 +35,8 @@ export async function GET(
 
     if (invoiceError) throw invoiceError
 
-    const totalInvoicesCount = invoices.length
-    const paidInvoices = invoices.filter((inv) => inv.status === "paid")
+    const totalInvoicesCount = invoices?.length || 0
+    const paidInvoices = (invoices || []).filter((inv) => inv.status === "paid")
     const totalPaidCount = paidInvoices.length
 
     // Calculate average payment days (paid_at - issue_date)
@@ -59,52 +47,36 @@ export async function GET(
         const days = Math.round(
           (new Date(inv.paid_at).getTime() - new Date(inv.issue_date).getTime()) / (1000 * 3600 * 24)
         )
-        totalPaymentDays += Math.max(0, days)
-        countPaidWithDates++
+        if (days >= 0) {
+          totalPaymentDays += days
+          countPaidWithDates++
+        }
       }
     })
 
-    const averagePaymentDays = countPaidWithDates > 0 ? Math.round(totalPaymentDays / countPaidWithDates) : 0
-    const onTimePaymentRate = totalPaidCount > 0
-      ? Math.round(
-          (paidInvoices.filter((inv) => {
-            if (inv.paid_at && inv.due_date) {
-              return new Date(inv.paid_at) <= new Date(inv.due_date)
-            }
-            return true
-          }).length /
-            totalPaidCount) *
-            100
-        )
-      : 100
+    const avgPaymentDays = countPaidWithDates > 0 ? Math.round(totalPaymentDays / countPaidWithDates) : 0
 
-    // Fetch reminder history
-    let reminderHistory: any[] = []
-    if (invoices.length > 0) {
-      const invoiceIds = invoices.map((i) => i.id)
-      const { data: remLogs } = await supabase
-        .from("reminder_logs")
-        .select("id, invoice_id, reminder_type, channel, status, sent_at, message_content")
-        .in("invoice_id", invoiceIds)
-        .order("sent_at", { ascending: false })
-
-      reminderHistory = remLogs || []
-    }
+    const mappedInvoices = (invoices || []).map((inv) => {
+      let isOverdue = false
+      if (["sent", "viewed", "partial"].includes(inv.status)) {
+        if (new Date(inv.due_date) < new Date()) {
+          isOverdue = true
+        }
+      }
+      return {
+        ...inv,
+        displayStatus: isOverdue ? "overdue" : inv.status,
+      }
+    })
 
     return NextResponse.json({
-      client: {
-        ...client,
-        outstanding_amount: Math.max(0, (Number(client.total_invoiced) || 0) - (Number(client.total_paid) || 0)),
-      },
+      client,
+      invoices: mappedInvoices,
       stats: {
-        totalInvoiced: Number(client.total_invoiced) || 0,
-        totalPaid: Number(client.total_paid) || 0,
-        outstandingBalance: Math.max(0, (Number(client.total_invoiced) || 0) - (Number(client.total_paid) || 0)),
-        averagePaymentDays,
-        onTimePaymentRate,
+        totalInvoicesCount,
+        totalPaidCount,
+        avgPaymentDays,
       },
-      invoices: invoices || [],
-      reminders: reminderHistory,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
@@ -115,24 +87,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const supabase = getSupabaseServiceRoleClient()
 
     const body = await request.json()
     const validation = clientSchema.safeParse(body)
@@ -187,27 +147,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authErr, business } = await requireBusinessUser(request)
+  if (authErr) return authErr
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Verify the client belongs to this business
-    const { data: client } = await supabase
+    const { data: client } = await adminDb
       .from("clients")
       .select("id, name")
       .eq("id", id)
@@ -217,9 +165,6 @@ export async function DELETE(
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 })
     }
-
-    // Use service role client to bypass RLS for cascade deletion
-    const adminDb = getSupabaseServiceRoleClient()
 
     // 1. Get all invoice IDs for this client
     const { data: invoices } = await adminDb

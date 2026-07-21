@@ -245,7 +245,7 @@ export default function TasksPage() {
 
       {/* Create Task Modal Dialog */}
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-xl rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black">Create Workspace Task</DialogTitle>
             <DialogDescription className="text-ink-secondary text-xs mt-1.5">

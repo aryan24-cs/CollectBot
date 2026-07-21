@@ -9,15 +9,20 @@ import {
   Users,
   Bell,
   Settings,
-  ChevronDown, 
-  Sparkles, 
-  Clock, 
+  ChevronDown,
+  ChevronRight,
   Briefcase, 
   Target, 
-  FolderPlus,
   LogOut,
   Building,
-  User
+  Wallet,
+  CheckSquare,
+  UserPlus,
+  GitBranch,
+  Shield,
+  Receipt,
+  Megaphone,
+  Ticket
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import getSupabaseBrowserClient from "@/lib/supabase/client"
@@ -56,6 +61,19 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
   const [isOwner, setIsOwner] = React.useState(true)
   const [employeeType, setEmployeeType] = React.useState<string>("OWNER")
 
+  // Collapsible section state
+  const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
+    finance: true,
+    sales: true,
+    marketing: true,
+    people: true,
+    workspace: true,
+  })
+
+  const toggleSection = (key: string) => {
+    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
+  }
+
   // Load actual numbers & permissions dynamically
   React.useEffect(() => {
     async function loadPermissions() {
@@ -63,56 +81,42 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
         const res = await fetch("/api/settings/business")
         if (res.ok) {
           const data = await res.json()
-          setPermissions(data.permissions || ["all"])
           setIsOwner(data.isOwner !== false)
-          setEmployeeType(data.employee?.employee_type || "OWNER")
+          setPermissions(data.permissions || ["all"])
+          if (data.employee?.employee_type) {
+            setEmployeeType(data.employee.employee_type)
+          } else if (data.isOwner !== false) {
+            setEmployeeType("OWNER")
+          }
         }
       } catch (err) {
-        console.error("Failed to load permissions:", err)
+        console.error("Failed to load user permissions:", err)
       }
     }
 
     async function loadStats() {
       try {
-        // Fetch invoices
-        const resInvoices = await fetch("/api/invoices?limit=1000")
-        if (resInvoices.ok) {
-          const data = await resInvoices.json()
-          const list = data.invoices || []
-          const draft = list.filter((inv: any) => inv.status === "draft").length
-          const sent = list.filter((inv: any) => ["sent", "viewed"].includes(inv.status)).length
-          const overdue = list.filter((inv: any) => {
-            if (inv.status === "overdue") return true
-            if (["sent", "viewed", "partial"].includes(inv.status)) {
-              return new Date(inv.due_date) < new Date()
-            }
-            return false
-          }).length
-          
-          setStats(prev => ({
-            ...prev,
-            allInvoices: list.length,
-            draftInvoices: draft,
-            sentInvoices: sent,
-            overdueInvoices: overdue,
-          }))
-        }
+        const [invRes, clientRes] = await Promise.all([
+          fetch("/api/invoices?limit=1000"),
+          fetch("/api/clients?limit=1000")
+        ])
 
-        // Fetch clients
-        const resClients = await fetch("/api/clients?limit=1000")
-        if (resClients.ok) {
-          const data = await resClients.json()
-          const list = data.clients || []
-          const vip = list.filter((c: any) => 
-            (c.tags && c.tags.includes("VIP")) || Number(c.total_invoiced) > 100000
-          ).length
-          const slow = list.filter((c: any) => Number(c.outstanding_amount || 0) > 0).length
+        if (invRes.ok && clientRes.ok) {
+          const invData = await invRes.json()
+          const clientData = await clientRes.json()
+
+          const invoices = invData.invoices || []
+          const clients = clientData.clients || []
 
           setStats(prev => ({
             ...prev,
-            allClients: list.length,
-            vipClients: vip,
-            slowPayers: slow,
+            allInvoices: invoices.length,
+            draftInvoices: invoices.filter((i: any) => i.status === "draft").length,
+            sentInvoices: invoices.filter((i: any) => i.status === "sent").length,
+            overdueInvoices: invoices.filter((i: any) => i.displayStatus === "overdue" || i.status === "overdue").length,
+            allClients: clients.length,
+            vipClients: clients.filter((c: any) => c.tags?.includes("VIP") || (c.total_invoiced || 0) > 100000).length,
+            slowPayers: clients.filter((c: any) => c.outstanding_amount > 0).length,
           }))
         }
       } catch (err) {
@@ -150,10 +154,10 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
       return ["dashboard", "invoices", "expenses", "tasks", "reminders", "approvals"].includes(section)
     }
     if (employeeType === "SALES") {
-      return ["dashboard", "clients"].includes(section)
+      return ["dashboard", "sales", "clients", "tasks"].includes(section)
     }
     if (employeeType === "MARKETING") {
-      return ["dashboard"].includes(section)
+      return ["dashboard", "marketing", "clients", "tasks"].includes(section)
     }
     return false
   }
@@ -164,35 +168,119 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     employeeType === "MARKETING" ? "/dashboard/marketing" :
     "/dashboard"
 
+  // Helper component for a nav link
+  const NavLink = ({ href, icon: Icon, label, badge, badgeVariant = "default" }: { 
+    href: string; 
+    icon: any; 
+    label: string; 
+    badge?: number | string;
+    badgeVariant?: "default" | "danger"
+  }) => (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center justify-between px-3 py-2 rounded-lg text-[13px] font-semibold transition-all duration-150",
+        isTabActive(href)
+          ? "bg-white text-ink-primary shadow-sm border border-[#EEE9E4]"
+          : "text-ink-secondary hover:bg-white/50 hover:text-ink-primary"
+      )}
+    >
+      <div className="flex items-center gap-2.5">
+        <Icon className={cn("w-4 h-4 shrink-0", isTabActive(href) ? "text-[#E91E63]" : "text-ink-muted")} />
+        <span>{label}</span>
+      </div>
+      {badge !== undefined && badge !== 0 && (
+        <span className={cn(
+          "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+          badgeVariant === "danger"
+            ? "bg-[#FFEBEE] text-[#C62828]"
+            : "bg-cream-200 text-ink-secondary"
+        )}>
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+
+  // Helper component for a section header
+  const SectionHeader = ({ label, sectionKey }: { label: string; sectionKey: string }) => (
+    <button
+      onClick={() => toggleSection(sectionKey)}
+      className="flex items-center justify-between w-full px-3 py-1.5 text-[9px] font-bold tracking-widest uppercase text-ink-muted hover:text-ink-secondary transition-colors cursor-pointer"
+    >
+      <span>{label}</span>
+      <ChevronRight className={cn(
+        "w-3 h-3 transition-transform duration-200",
+        expandedSections[sectionKey] && "rotate-90"
+      )} />
+    </button>
+  )
+
+  // Helper: inline sub-link
+  const SubLink = ({ href, label, badge, badgeVariant = "default" }: { 
+    href: string; 
+    label: string; 
+    badge?: number | string;
+    badgeVariant?: "default" | "danger"
+  }) => (
+    <Link
+      href={href}
+      className={cn(
+        "flex items-center justify-between py-1.5 px-2 rounded-md text-[12px] transition-colors",
+        pathname === href || (href.includes("?") && pathname === href.split("?")[0])
+          ? "text-ink-primary font-semibold bg-white/40"
+          : "text-ink-secondary hover:text-ink-primary hover:bg-white/30"
+      )}
+    >
+      <span>{label}</span>
+      {badge !== undefined && badge !== 0 && (
+        <span className={cn(
+          "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+          badgeVariant === "danger"
+            ? "bg-[#FFEBEE] text-[#C62828]"
+            : "bg-cream-200/80 text-ink-muted"
+        )}>
+          {badge}
+        </span>
+      )}
+    </Link>
+  )
+
+  // Compute section visibility
+  const showSalesHub = employeeType === "OWNER" || employeeType === "SALES"
+  const showMarketingHub = employeeType === "OWNER" || employeeType === "MARKETING"
+  const showFinanceHub = employeeType === "OWNER" || employeeType === "FINANCE"
+  const showWorkspaceSection = isOwner || employeeType === "OWNER"
+
   return (
-    <div className="w-64 flex-shrink-0 flex flex-col h-screen sticky top-0 bg-[#F5F1EE] border-r border-[#EEE9E4] select-none py-6 pl-4 pr-4 justify-between">
+    <div className="w-64 flex-shrink-0 flex flex-col h-screen sticky top-0 bg-[#F5F1EE] border-r border-[#EEE9E4] select-none py-5 px-3 justify-between">
       {/* Top Section */}
-      <div className="space-y-6 overflow-y-auto pr-1 scrollbar-thin">
+      <div className="space-y-4 overflow-y-auto pr-0.5 scrollbar-thin flex-1">
         
-        {/* Brand Header with C Logo */}
-        <div className="flex items-center gap-3 px-2">
+        {/* Brand Header */}
+        <div className="flex items-center gap-2.5 px-2 mb-1">
           <div className="w-8 h-8 rounded-full bg-[#1A1A1A] flex items-center justify-center text-sm font-extrabold text-white shadow-soft">
             C
           </div>
-          <span className="text-sm font-extrabold text-[#0A0A0A] font-display tracking-tight">CollectBot</span>
+          <span className="text-sm font-extrabold text-[#0A0A0A] tracking-tight">CollectBot</span>
         </div>
 
         {/* Business Selector Dropdown */}
-        <div className="px-1">
+        <div className="px-0.5">
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2.5 hover:bg-cream-200/50 p-2 rounded-xl transition-all cursor-pointer w-full text-left focus:outline-none border border-transparent hover:border-[#EEE9E4]/40 bg-[#FAF8F5]/30">
+            <DropdownMenuTrigger className="flex items-center gap-2.5 hover:bg-cream-200/50 p-2.5 rounded-lg transition-all cursor-pointer w-full text-left focus:outline-none border border-[#EEE9E4]/50 bg-white/40">
               <div className="w-7 h-7 rounded-lg bg-[#E91E63]/10 flex items-center justify-center border border-[#E91E63]/20 shrink-0 text-[#E91E63] font-extrabold text-xs">
                 {business.name.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-ink-primary truncate">{business.name}</p>
-                <p className="text-[9px] text-ink-secondary truncate">{isOwner ? "Owner Account" : "Employee Portal"}</p>
+                <p className="text-[9px] text-ink-secondary truncate">{isOwner ? "Owner" : `${employeeType} Dept`}</p>
               </div>
               <ChevronDown className="w-3 h-3 text-ink-secondary shrink-0" />
             </DropdownMenuTrigger>
             
             <DropdownMenuContent className="w-52 bg-white border border-surface-border rounded-xl shadow-floating z-50">
-              {hasAccess("settings", "view") && isSectionVisible("settings") && (
+              {showWorkspaceSection && (
                 <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer text-xs font-semibold py-2">
                   <Building className="w-4 h-4 mr-2 text-ink-secondary" />
                   Business Settings
@@ -207,307 +295,90 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
           </DropdownMenu>
         </div>
 
-        {/* Primary Sections Tree */}
-        <nav className="space-y-1">
-          
-          {/* Dashboard Link */}
-          {isSectionVisible("dashboard") && (
-            <div className="space-y-0.5">
-              <Link
-                href={dashboardHref}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive(dashboardHref)
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <LayoutDashboard className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Dashboard</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Invoices Link */}
-          {isSectionVisible("invoices") && hasAccess("invoices", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/invoices"
-                className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/invoices")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <FileText className="w-4 h-4 shrink-0 text-ink-secondary" />
-                  <span>Invoices</span>
-                </div>
-                <span className="bg-cream-200 text-ink-secondary px-1.5 py-0.5 rounded-pill text-[9px] font-bold">
-                  {stats.allInvoices}
-                </span>
-              </Link>
-              
-              {/* Indented Subroutes for Invoices */}
-              {isTabActive("/invoices") && (
-                <div className="pl-8 border-l border-[#EEE9E4] ml-5 space-y-1 mt-1 mb-2 animate-in fade-in duration-200">
-                  <Link
-                    href="/invoices?status=all"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>All Invoices</span>
-                  </Link>
-                  <Link
-                    href="/invoices?status=draft"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Draft</span>
-                    <span className="bg-cream-200 text-ink-secondary px-1.5 py-0.2 rounded-pill text-[9px]">
-                      {stats.draftInvoices}
-                    </span>
-                  </Link>
-                  <Link
-                    href="/invoices?status=sent"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Sent</span>
-                    <span className="bg-cream-200 text-ink-secondary px-1.5 py-0.2 rounded-pill text-[9px]">
-                      {stats.sentInvoices}
-                    </span>
-                  </Link>
-                  <Link
-                    href="/invoices?status=overdue"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Overdue</span>
-                    {stats.overdueInvoices > 0 && (
-                      <span className="bg-[#FFEBEE] text-[#C62828] font-bold px-1.5 py-0.2 rounded-pill text-[9px]">
-                        {stats.overdueInvoices}
-                      </span>
-                    )}
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Expenses Module */}
-          {isSectionVisible("expenses") && hasAccess("expenses", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/expenses"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/expenses")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <Briefcase className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Expenses</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Tasks Module */}
-          {isSectionVisible("tasks") && hasAccess("invoices", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/tasks"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/tasks")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <Target className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Tasks</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Clients Link */}
-          {isSectionVisible("clients") && hasAccess("clients", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/clients"
-                className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/clients")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4 shrink-0 text-ink-secondary" />
-                  <span>Clients</span>
-                </div>
-                <span className="bg-cream-200 text-ink-secondary px-1.5 py-0.5 rounded-pill text-[9px] font-bold">
-                  {stats.allClients}
-                </span>
-              </Link>
-              
-              {/* Indented Subroutes for Clients */}
-              {isTabActive("/clients") && (
-                <div className="pl-8 border-l border-[#EEE9E4] ml-5 space-y-1 mt-1 mb-2 animate-in fade-in duration-200">
-                  <Link
-                    href="/clients"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>All Clients</span>
-                  </Link>
-                  <Link
-                    href="/clients?filter=vip"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>VIP Contacts</span>
-                    {stats.vipClients > 0 && (
-                      <span className="bg-cream-200 text-ink-secondary px-1.5 py-0.2 rounded-pill text-[9px]">
-                        {stats.vipClients}
-                      </span>
-                    )}
-                  </Link>
-                  <Link
-                    href="/clients?filter=outstanding"
-                    className="flex items-center justify-between py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Slow Payers</span>
-                    {stats.slowPayers > 0 && (
-                      <span className="bg-[#FDF2F7] text-[#E91E63] font-bold px-1.5 py-0.2 rounded-pill text-[9px]">
-                        {stats.slowPayers}
-                      </span>
-                    )}
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Reminders Link */}
-          {isSectionVisible("reminders") && hasAccess("payments", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/reminders"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/reminders")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <Bell className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Reminders</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Approvals Module */}
-          {isSectionVisible("approvals") && hasAccess("approvals", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/approvals"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/approvals")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <Briefcase className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Approvals</span>
-              </Link>
-            </div>
-          )}
-
-          {/* Settings Link */}
-          {isSectionVisible("settings") && hasAccess("settings", "view") && (
-            <div className="space-y-0.5">
-              <Link
-                href="/settings"
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border border-transparent",
-                  isTabActive("/settings")
-                    ? "bg-white text-ink-primary shadow-soft border-[#EEE9E4]"
-                    : "text-ink-secondary hover:bg-cream-200/30 hover:text-ink-primary"
-                )}
-              >
-                <Settings className="w-4 h-4 shrink-0 text-ink-secondary" />
-                <span className="flex-1">Settings</span>
-              </Link>
-              
-              {/* Indented Subroutes for Settings */}
-              {isTabActive("/settings") && (
-                <div className="pl-8 border-l border-[#EEE9E4] ml-5 space-y-1 mt-1 mb-2 animate-in fade-in duration-200">
-                  <Link
-                    href="/settings/employees"
-                    className="flex items-center py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Teammates Directory</span>
-                  </Link>
-                  <Link
-                    href="/settings/departments"
-                    className="flex items-center py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Departments</span>
-                  </Link>
-                  <Link
-                    href="/settings/roles"
-                    className="flex items-center py-1 text-xs text-ink-secondary hover:text-ink-primary"
-                  >
-                    <span>Roles & RBAC</span>
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
+        {/* ─── OVERVIEW ─── */}
+        <nav className="space-y-0.5">
+          <NavLink href={dashboardHref} icon={LayoutDashboard} label="Dashboard" />
         </nav>
 
-        {/* Grouped Folders / Shortcuts */}
-        {employeeType === "OWNER" && (
-          <div className="space-y-1.5 px-2 pt-4 border-t border-[#EEE9E4]/60">
-            <div className="flex items-center justify-between text-[9px] font-bold tracking-wider uppercase text-ink-muted px-2">
-              <span>Starred</span>
-            </div>
-            
-            <div className="space-y-0.5">
-              {[
-                { name: "Recent activity", href: "/dashboard", icon: Clock },
-                { name: "Sales list", href: "/invoices", icon: Briefcase },
-                { name: "Goals", href: "/settings", icon: Target },
-              ].map((shortcut) => {
-                const Icon = shortcut.icon
-                return (
-                  <Link
-                    key={shortcut.name}
-                    href={shortcut.href}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[#6B6B6B] hover:text-[#0A0A0A] hover:bg-cream-200/40 transition-colors"
-                  >
-                    <Icon className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-                    {shortcut.name}
-                  </Link>
-                )
-              })}
-            </div>
+        {/* ─── SALES HUB (For OWNER & SALES Employees) ─── */}
+        {showSalesHub && (
+          <div className="space-y-1">
+            <SectionHeader label="Sales Hub" sectionKey="sales" />
+            {expandedSections.sales && (
+              <div className="space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <NavLink href="/dashboard/sales" icon={Briefcase} label="Leads & Pipeline" />
+                <NavLink href="/clients" icon={Users} label="Clients & Accounts" badge={stats.allClients || undefined} />
+                <NavLink href="/tasks" icon={Target} label="Sales Tasks" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── MARKETING HUB (For OWNER & MARKETING Employees) ─── */}
+        {showMarketingHub && (
+          <div className="space-y-1">
+            <SectionHeader label="Marketing Hub" sectionKey="marketing" />
+            {expandedSections.marketing && (
+              <div className="space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <NavLink href="/dashboard/marketing" icon={Megaphone} label="Campaigns & Alerts" />
+                <NavLink href="/dashboard/marketing?tab=coupons" icon={Ticket} label="Coupons & Promos" />
+                <NavLink href="/clients" icon={Users} label="Audience Contacts" badge={stats.allClients || undefined} />
+                <NavLink href="/tasks" icon={Target} label="Marketing Tasks" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── FINANCE HUB (For OWNER & FINANCE Employees) ─── */}
+        {showFinanceHub && (
+          <div className="space-y-1">
+            <SectionHeader label="Finance Hub" sectionKey="finance" />
+            {expandedSections.finance && (
+              <div className="space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <NavLink href="/invoices" icon={FileText} label="Invoices" badge={stats.allInvoices || undefined} />
+                {isTabActive("/invoices") && (
+                  <div className="ml-7 pl-3 border-l border-[#EEE9E4] mt-1 mb-1 space-y-0.5">
+                    <SubLink href="/invoices?status=draft" label="Drafts" badge={stats.draftInvoices || undefined} />
+                    <SubLink href="/invoices?status=sent" label="Sent" badge={stats.sentInvoices || undefined} />
+                    <SubLink href="/invoices?status=overdue" label="Overdue" badge={stats.overdueInvoices || undefined} badgeVariant="danger" />
+                  </div>
+                )}
+                <NavLink href="/expenses" icon={Wallet} label="Expenses" />
+                <NavLink href="/approvals" icon={CheckSquare} label="Approvals" />
+                <NavLink href="/reminders" icon={Bell} label="Reminders" />
+                <NavLink href="/tasks" icon={Target} label="Tasks" />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── WORKSPACE (For OWNER) ─── */}
+        {showWorkspaceSection && (
+          <div className="space-y-1">
+            <SectionHeader label="Workspace Settings" sectionKey="workspace" />
+            {expandedSections.workspace && (
+              <div className="space-y-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
+                <NavLink href="/settings/employees" icon={UserPlus} label="Teammates" />
+                <NavLink href="/settings/departments" icon={Building} label="Departments" />
+                <NavLink href="/settings/roles" icon={Shield} label="Roles & RBAC" />
+                <NavLink href="/settings" icon={Settings} label="Settings" />
+              </div>
+            )}
           </div>
         )}
 
       </div>
 
-      {/* Bottom Folder Manager Action */}
-      {employeeType === "OWNER" && (
-        <div className="px-2">
-          <button
-            onClick={() => router.push("/settings")}
-            className="w-full flex items-center justify-center gap-2 border border-dashed border-[#EEE9E4] hover:bg-cream-200/30 text-ink-secondary hover:text-ink-primary rounded-xl py-2.5 text-xs font-semibold transition-all cursor-pointer bg-white/40 shadow-soft"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-ink-muted shrink-0" />
-            Manage folders
-          </button>
+      {/* Bottom: Quick help / keyboard shortcut hint */}
+      <div className="pt-3 border-t border-[#EEE9E4]/60 mt-2 px-1">
+        <div className="flex items-center gap-2 text-[10px] text-ink-muted px-2 py-1.5">
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">N</kbd>
+          <span>New Item</span>
+          <span className="text-[#EEE9E4]">·</span>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">C</kbd>
+          <span>New Client</span>
         </div>
-      )}
+      </div>
     </div>
   )
 }

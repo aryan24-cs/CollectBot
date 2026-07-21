@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   if (error) return error
 
   try {
-    const supabase = await getSupabaseServerClient()
+    // Use service role client to bypass the recursive RLS policy on employees.
+    // Auth & business ownership are already validated by requireBusinessUser above.
+    const supabase = getSupabaseServiceRoleClient()
     const { data: employees, error: empError } = await supabase
       .from("employees")
       .select("*, department:departments(id, name), custom_role:custom_roles(id, name), branch:branches(id, name)")

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { requireBusinessUser } from "@/lib/auth/checkRole"
 
@@ -8,14 +7,35 @@ export async function GET(request: NextRequest) {
   if (error) return error
 
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: requests, error: queryError } = await supabase
+    const supabase = getSupabaseServiceRoleClient()
+
+    let { data: requests, error: queryError } = await supabase
       .from("approval_requests")
-      .select("*, requester:employees(id, name), approval_steps(*)")
+      .select("*, requester:employees!requester_id(id, name), approval_steps(*)")
       .eq("business_id", business.id)
       .order("created_at", { ascending: false })
 
-    if (queryError) throw queryError
+    if (queryError) {
+      console.warn("Approvals FK join query failed, falling back to manual join:", queryError.message)
+      const { data: rawRequests, error: rawError } = await supabase
+        .from("approval_requests")
+        .select("*, approval_steps(*)")
+        .eq("business_id", business.id)
+        .order("created_at", { ascending: false })
+
+      if (rawError) throw rawError
+
+      const { data: employees } = await supabase
+        .from("employees")
+        .select("id, name")
+        .eq("business_id", business.id)
+
+      const empMap = new Map((employees || []).map((e) => [e.id, e]))
+      requests = (rawRequests || []).map((req) => ({
+        ...req,
+        requester: req.requester_id ? empMap.get(req.requester_id) || null : null,
+      }))
+    }
 
     // Enrich with target object details
     const enriched = await Promise.all(
@@ -33,8 +53,9 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json(enriched)
+    return NextResponse.json(enriched || [])
   } catch (err: any) {
+    console.error("GET /api/approvals error:", err)
     return NextResponse.json({ error: err.message || "Failed to load approvals" }, { status: 500 })
   }
 }
@@ -79,8 +100,8 @@ export async function POST(request: NextRequest) {
         .update({
           status: statusValue,
           comment: comment || null,
-          approver_id: employee?.id || null, // null if approved by owner
-          decided_at: new Date().toISOString()
+          approver_id: employee?.id || null,
+          decided_at: new Date().toISOString(),
         })
         .eq("id", activeStep.id)
     }
@@ -90,7 +111,7 @@ export async function POST(request: NextRequest) {
       .from("approval_requests")
       .update({
         status: statusValue,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", approval_request_id)
 
@@ -101,7 +122,7 @@ export async function POST(request: NextRequest) {
         .update({
           status: statusValue,
           approved_by: employee?.id || null,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("id", appReq.target_id)
     }
@@ -111,7 +132,7 @@ export async function POST(request: NextRequest) {
       business_id: business.id,
       type: "approval_decision",
       description: `Approval request for ${appReq.type} was ${statusValue}.`,
-      metadata: { approval_request_id, decision: statusValue }
+      metadata: { approval_request_id, decision: statusValue },
     })
 
     return NextResponse.json({ success: true, status: statusValue })

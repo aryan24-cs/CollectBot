@@ -221,7 +221,7 @@ export default function ApprovalsPage() {
 
       {/* Review Dialog Modal */}
       <Dialog open={!!selectedReq} onOpenChange={(open) => !open && setSelectedReq(null)}>
-        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-md rounded-card shadow-floating z-50">
+        <DialogContent className="bg-white border-surface-border text-ink-primary max-w-lg rounded-card shadow-floating z-50">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-ink-black capitalize">
               {actionType === "approve" ? "Approve" : "Reject"} Request

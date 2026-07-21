@@ -1,4 +1,5 @@
 import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { NextResponse } from "next/server"
 
 export async function requireBusinessUser(request: Request) {
@@ -36,12 +37,16 @@ export async function requireBusinessUser(request: Request) {
       business: null
     }
   }
+
+  // Use service role client for business/employee lookups to bypass
+  // the recursive RLS policy on employees table
+  const adminDb = getSupabaseServiceRoleClient()
   
   let business = null
   let employee = null
 
   // 1. Check if direct business owner
-  const { data: directBusiness } = await supabase
+  const { data: directBusiness } = await adminDb
     .from("businesses")
     .select("*")
     .eq("user_id", user.id)
@@ -51,7 +56,7 @@ export async function requireBusinessUser(request: Request) {
     business = directBusiness
   } else {
     // 2. Check if active employee linked to a business
-    const { data: empRecord } = await supabase
+    const { data: empRecord } = await adminDb
       .from("employees")
       .select("*, business:businesses(*)")
       .eq("user_id", user.id)
