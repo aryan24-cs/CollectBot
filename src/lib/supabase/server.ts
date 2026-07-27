@@ -1,14 +1,32 @@
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 
+function getValidSupabaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (raw && typeof raw === "string" && raw.startsWith("http")) {
+    try {
+      new URL(raw)
+      return raw
+    } catch (_) {
+      // Fallback below
+    }
+  }
+  return "https://placeholder-project.supabase.co"
+}
+
+function getValidAnonKey(): string {
+  const raw = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  return (raw && typeof raw === "string" && raw.trim().length > 10) 
+    ? raw 
+    : "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2MDA0MDAwMDAsImV4cCI6MjAwMDAwMDAwMH0.placeholder"
+}
+
 export default async function getSupabaseServerClient() {
   const cookieStore = await cookies()
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://placeholder-project.supabase.co"
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key"
 
   return createServerClient(
-    url,
-    key,
+    getValidSupabaseUrl(),
+    getValidAnonKey(),
     {
       cookies: {
         getAll() {
@@ -20,9 +38,7 @@ export default async function getSupabaseServerClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // The `setAll` method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing
-            // user sessions.
+            // Ignored in Server Components
           }
         },
       },
