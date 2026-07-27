@@ -8,6 +8,7 @@ import ContextSidebar from "@/components/layout/ContextSidebar"
 import TopBar from "@/components/layout/TopBar"
 import Header from "@/components/layout/Header"
 import MobileBottomNav from "@/components/layout/MobileBottomNav"
+import TopProgressBar from "@/components/layout/TopProgressBar"
 import { Button } from "@/components/ui/button"
 
 interface LayoutClientProps {
@@ -70,6 +71,7 @@ export default function DashboardLayoutClient({
 
   return (
     <div className="min-h-screen bg-cream-100 text-ink-primary flex flex-col md:flex-row">
+      <TopProgressBar />
       {/* Sidebars - Desktop (Dual Sidebar layout) */}
       <div className="hidden md:flex flex-row shrink-0">
         <ContextSidebar business={business} />

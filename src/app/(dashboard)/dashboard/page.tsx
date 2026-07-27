@@ -122,50 +122,59 @@ export default function DashboardPage() {
         return
       }
 
-      // 2. Fetch Invoices
-      const { data: invoices, error: invError } = await supabase
-        .from("invoices")
-        .select(`
-          id,
-          total,
-          amount_paid,
-          balance_due,
-          status,
-          issue_date,
-          due_date,
-          client_id,
-          client:clients(name, company_name)
-        `)
-        .eq("business_id", biz.id)
+      // 2. Parallel Fetch Invoices, Clients, Logs, Leads, Campaigns
+      const [
+        { data: invoices },
+        { data: clients },
+        { data: logs },
+        { data: leads },
+        { data: campaigns }
+      ] = await Promise.all([
+        supabase
+          .from("invoices")
+          .select(`
+            id,
+            total,
+            amount_paid,
+            balance_due,
+            status,
+            issue_date,
+            due_date,
+            client_id,
+            client:clients(name, company_name)
+          `)
+          .eq("business_id", biz.id),
+        supabase
+          .from("clients")
+          .select("id, name, total_invoiced, total_paid, company_name")
+          .eq("business_id", biz.id),
+        supabase
+          .from("activity_logs")
+          .select("*")
+          .eq("business_id", biz.id)
+          .order("created_at", { ascending: false })
+          .limit(5),
+        supabase
+          .from("sales_leads")
+          .select("*")
+          .eq("business_id", biz.id)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("marketing_campaigns")
+          .select("*")
+          .eq("business_id", biz.id)
+          .order("created_at", { ascending: false })
+      ])
 
-      if (invError) throw invError
-
-      // 3. Fetch Clients
-      const { data: clients, error: cliError } = await supabase
-        .from("clients")
-        .select("id, name, total_invoiced, total_paid, company_name")
-        .eq("business_id", biz.id)
-
-      if (cliError) throw cliError
-
-      // 4. Fetch Logs
-      const { data: logs } = await supabase
-        .from("activity_logs")
-        .select("*")
-        .eq("business_id", biz.id)
-        .order("created_at", { ascending: false })
-        .limit(5)
-      setRecentLogs(logs || [])
-
-      // 5. Fetch Leads
-      const { data: leads } = await supabase
-        .from("sales_leads")
-        .select("*")
-        .eq("business_id", biz.id)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
+      const invoiceList = invoices || []
+      const clientList = clients || []
       const leadList = leads || []
+      const campaignList = campaigns || []
+
+      setRecentLogs(logs || [])
       setRecentLeads(leadList.slice(0, 4))
+      setRecentCampaigns(campaignList.slice(0, 4))
 
       // Compute Sales Stats
       const totalLeads = leadList.length
@@ -182,17 +191,6 @@ export default function DashboardPage() {
         conversionRate,
         pipelineValue
       })
-
-      // 6. Fetch Campaigns
-      const { data: campaigns } = await supabase
-        .from("marketing_campaigns")
-        .select("*")
-        .eq("business_id", biz.id)
-        .is("deleted_at", null)
-        .order("created_at", { ascending: false })
-      const campList = campaigns || []
-      setRecentCampaigns(campList.slice(0, 4))
-
       // Fetch Coupons
       const { data: coupons } = await supabase
         .from("marketing_coupons")
@@ -201,8 +199,8 @@ export default function DashboardPage() {
         .is("deleted_at", null)
 
       setMarketingStats({
-        totalCampaigns: campList.length,
-        runningCampaigns: campList.filter(c => c.status === "scheduled" || c.status === "sending").length,
+        totalCampaigns: campaignList.length,
+        runningCampaigns: campaignList.filter((c: any) => c.status === "scheduled" || c.status === "sending").length,
         totalCoupons: coupons?.length || 0,
         averageRoi: "3.5"
       })

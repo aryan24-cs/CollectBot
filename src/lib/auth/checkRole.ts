@@ -55,15 +55,41 @@ export async function requireBusinessUser(request: Request) {
   if (directBusiness) {
     business = directBusiness
   } else {
-    // 2. Check if active employee linked to a business
-    const { data: empRecord } = await adminDb
+    // 2. Check if employee linked to a business by user_id or email
+    let { data: empRecord } = await adminDb
       .from("employees")
       .select("*, business:businesses(*)")
       .eq("user_id", user.id)
-      .eq("status", "active")
       .maybeSingle()
 
+    if (!empRecord && user.email) {
+      const { data: empByEmail } = await adminDb
+        .from("employees")
+        .select("*, business:businesses(*)")
+        .ilike("email", user.email)
+        .maybeSingle()
+      empRecord = empByEmail
+    }
+
     if (empRecord && empRecord.business) {
+      if (empRecord.status === "suspended") {
+        return {
+          error: NextResponse.json({ error: "Employee account suspended" }, { status: 403 }),
+          user: null,
+          business: null,
+          employee: null,
+          role: null
+        }
+      }
+
+      // Auto link user_id and activate status if missing
+      if (!empRecord.user_id || empRecord.status !== "active") {
+        await adminDb
+          .from("employees")
+          .update({ user_id: user.id, status: "active" })
+          .eq("id", empRecord.id)
+      }
+
       business = empRecord.business
       employee = empRecord
     }

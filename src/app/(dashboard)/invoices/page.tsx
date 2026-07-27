@@ -16,7 +16,8 @@ import {
   Loader2,
   AlertTriangle,
   Edit3,
-  FileText
+  FileText,
+  Download
 } from "lucide-react"
 import { toast } from "sonner"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -250,13 +251,22 @@ export default function InvoicesPage() {
           <h1 className="text-3xl font-extrabold tracking-tight text-ink-black leading-tight">Invoices</h1>
           <p className="text-ink-secondary text-sm">Issue itemized bills, capture client receipts, and run auto-reconciliation.</p>
         </div>
-        <Link
-          href="/invoices/new"
-          className="btn-primary px-4 py-2.5 rounded-button text-xs font-bold gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Invoice
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Link
+            href="/settings/exports"
+            className="bg-[#FAF8F5] hover:bg-cream-200 border border-[#EEE9E4] text-[#0A0A0A] px-4 py-2.5 rounded-button text-xs font-bold gap-2 flex items-center shadow-soft transition-all"
+          >
+            <Download className="w-4 h-4 text-emerald-600" />
+            Tally Export
+          </Link>
+          <Link
+            href="/invoices/new"
+            className="btn-primary px-4 py-2.5 rounded-button text-xs font-bold gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Invoice
+          </Link>
+        </div>
       </div>
 
       {/* Invoice Stats Summary Cards */}

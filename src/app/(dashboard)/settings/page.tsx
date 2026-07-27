@@ -428,7 +428,13 @@ export default function SettingsPage() {
           {[
             { id: "profile", label: "Business Profile", icon: Building2 },
             { id: "invoice", label: "Invoice Settings", icon: FileText },
-            { id: "payment", label: "Payment & Banking", icon: CreditCard },
+            { id: "branding", label: "Invoice Designer", icon: Sparkles, href: "/settings/branding" },
+            { id: "gateways", label: "Payment Gateways", icon: CreditCard, href: "/settings/gateways" },
+            { id: "exports", label: "Accounting Exports", icon: FileText, href: "/settings/exports" },
+            { id: "employees", label: "Teammates", icon: Users, href: "/settings/employees" },
+            { id: "departments", label: "Departments", icon: Building2, href: "/settings/departments" },
+            { id: "roles", label: "Roles & RBAC", icon: Lock, href: "/settings/roles" },
+            { id: "payment", label: "Bank & UPI Details", icon: CreditCard },
             { id: "notifications", label: "Alert Schedules", icon: Bell },
             { id: "plans", label: "Pricing & Plans", icon: Sparkles },
           ].map((tab) => {
@@ -437,7 +443,13 @@ export default function SettingsPage() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => {
+                  if (tab.href) {
+                    window.location.href = tab.href
+                  } else {
+                    setActiveTab(tab.id as any)
+                  }
+                }}
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 text-xs font-bold rounded-xl transition-all cursor-pointer border-none",
                   isActive
