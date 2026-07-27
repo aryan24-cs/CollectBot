@@ -7,6 +7,8 @@ import InvoiceDocument from "@/lib/pdf/InvoiceDocument"
 import { sendInvoiceNotification } from "@/lib/whatsapp/templates"
 import { sendInvoiceEmail } from "@/lib/email/send"
 
+export const dynamic = "force-dynamic"
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
