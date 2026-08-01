@@ -13,7 +13,7 @@ function getValidSupabaseUrl(): string {
     } catch (_) {
       // Fallback
     }
-  }
+  }  
   return SUPABASE_URL
 }
 
