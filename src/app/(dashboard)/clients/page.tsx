@@ -96,25 +96,8 @@ export default function ClientsPage() {
       setClients(data.clients || [])
       setTotalCount(data.totalCount || 0)
 
-      // Fetch summary sums across all clients
-      const allRes = await fetch("/api/clients?limit=1000")
-      if (allRes.ok) {
-        const allData = await allRes.json()
-        const allClis: Client[] = allData.clients || []
-        
-        let outstandingSum = 0
-        let paidSum = 0
-
-        allClis.forEach((c) => {
-          outstandingSum += (c as any).outstanding_amount || 0
-          paidSum += Number(c.total_paid) || 0
-        })
-
-        setStats({
-          totalClients: allClis.length,
-          outstandingSum,
-          paidSum,
-        })
+      if (data.stats) {
+        setStats(data.stats)
       }
     } catch (err: any) {
       console.error(err)

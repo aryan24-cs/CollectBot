@@ -68,111 +68,49 @@ export default function FinanceDashboardPage() {
   const loadDashboardData = React.useCallback(async () => {
     setIsLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push("/login")
-        return
-      }
-
-      let business: any = null
-      // Fetch profile via backend API (bypasses RLS)
-      const profileRes = await fetch("/api/settings/business")
-      if (profileRes.ok) {
-        const profileData = await profileRes.json()
-        business = profileData
-        setBusinessName(profileData.name || "Workspace")
-      } else {
-        router.push("/onboarding")
-        return
-      }
-
-      // Fetch Invoices
-      const { data: invoices, error: invError } = await supabase
-        .from("invoices")
-        .select(`
-          id,
-          total,
-          amount_paid,
-          balance_due,
-          status,
-          due_date,
-          created_at,
-          client:clients(id, name, email)
-        `)
-        .eq("business_id", business.id)
-
-      if (invError) throw invError
-
-      // Fetch Clients
-      const { data: clients } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("business_id", business.id)
-
-      const clientCount = clients?.length || 0
-
-      // Compute stats
-      let totalInvoiced = 0
-      let totalCollected = 0
-      let outstanding = 0
-      let overdueCount = 0
-      const list = invoices || []
-
-      list.forEach((inv) => {
-        totalInvoiced += Number(inv.total || 0)
-        totalCollected += Number(inv.amount_paid || 0)
-        outstanding += Number(inv.balance_due || 0)
-
-        // Check if overdue
-        if (["sent", "viewed", "partial"].includes(inv.status)) {
-          const days = getDaysOverdue(inv.due_date)
-          if (days > 0) {
-            overdueCount++
-          }
-        } else if (inv.status === "overdue") {
-          overdueCount++
+      const res = await fetch("/api/dashboard/overview")
+      const contentType = res.headers.get("content-type") || ""
+      if (!res.ok || !contentType.includes("application/json")) {
+        if (res.status === 401) {
+          router.push("/login")
+          return
         }
-      })
+        throw new Error("Failed to load finance dashboard")
+      }
+      const data = await res.json()
 
-      setStats({
-        totalInvoiced,
-        totalCollected,
-        outstanding,
-        overdueCount,
-        invoicesCount: list.length,
-        clientsCount: clientCount,
-      })
-
-      // Recent activity
-      const { data: logs } = await supabase
-        .from("activity_logs")
-        .select("*")
-        .eq("business_id", business.id)
-        .order("created_at", { ascending: false })
-        .limit(5)
-
-      setRecentLogs(logs || [])
-
-      // Recharts month calculation
-      const monthlyAggregates: Record<string, { name: string; billed: number; collected: number }> = {}
-      list.forEach(inv => {
-        const d = new Date(inv.created_at)
-        const monthLabel = d.toLocaleString("default", { month: "short" })
-        if (!monthlyAggregates[monthLabel]) {
-          monthlyAggregates[monthLabel] = { name: monthLabel, billed: 0, collected: 0 }
+      setBusinessName(data.business?.name || "Workspace")
+      setStats(
+        data.stats || {
+          totalInvoiced: 0,
+          totalCollected: 0,
+          outstanding: 0,
+          overdueCount: 0,
+          invoicesCount: 0,
+          clientsCount: 0,
         }
-        monthlyAggregates[monthLabel].billed += Number(inv.total || 0)
-        monthlyAggregates[monthLabel].collected += Number(inv.amount_paid || 0)
-      })
+      )
+      setChartData(data.chartData || [])
+      setRecentLogs(data.recentLogs || [])
 
-      setChartData(Object.values(monthlyAggregates))
-      setInvoiceBreakdown(list.slice(0, 5))
+      const totalInvoiced = data.stats?.totalInvoiced || 0
+      const clientStats = (data.topClients || []).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        amount: Number(c.total_invoiced) || 0,
+        percentage:
+          totalInvoiced > 0
+            ? Number(((Number(c.total_invoiced) / totalInvoiced) * 100).toFixed(1))
+            : 0,
+      }))
+      setTopClients(clientStats)
     } catch (err: any) {
-      toast.error(err.message || "Failed to load dashboard data.")
+      console.error("Finance dashboard load error:", err)
+      toast.error(err.message || "Failed to load dashboard statistics.")
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, router])
+  }, [router])
 
   React.useEffect(() => {
     if (mounted) {

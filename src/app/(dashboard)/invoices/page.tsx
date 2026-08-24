@@ -110,43 +110,8 @@ export default function InvoicesPage() {
       setInvoices(data.invoices || [])
       setTotalCount(data.totalCount || 0)
 
-      // Fetch all invoices to compute true stats totals
-      const allRes = await fetch("/api/invoices?limit=1000")
-      if (allRes.ok) {
-        const allData = await allRes.json()
-        const allInvs: Invoice[] = allData.invoices || []
-        
-        let totalInvoiced = 0
-        let collected = 0
-        let outstanding = 0
-        let overdue = 0
-
-        allInvs.forEach((inv) => {
-          const totalVal = Number(inv.total) || 0
-          const paidVal = Number(inv.amount_paid) || 0
-          const dueVal = Number(inv.balance_due) || 0
-
-          if (inv.status !== "cancelled") {
-            totalInvoiced += totalVal
-            collected += paidVal
-
-            if (["sent", "viewed", "overdue", "partial"].includes(inv.status)) {
-              outstanding += dueVal
-            }
-
-            const overdueDays = getDaysOverdue(inv.due_date)
-            if (inv.status === "overdue" || (["sent", "viewed", "partial"].includes(inv.status) && overdueDays > 0)) {
-              overdue += dueVal
-            }
-          }
-        })
-
-        setStats({
-          totalInvoiced,
-          collected,
-          outstanding,
-          overdue,
-        })
+      if (data.stats) {
+        setStats(data.stats)
       }
     } catch (err: any) {
       console.error(err)

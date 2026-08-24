@@ -138,15 +138,31 @@ export async function GET(request: NextRequest) {
       return sortOrder === "asc" ? comparison : -comparison
     })
 
-    // Paginate in JS
+    // Calculate total summary sums across all clients of this business
+    let outstandingSum = 0
+    let paidSum = 0
+    for (const c of clients) {
+      const inv = Number(c.total_invoiced) || 0
+      const pd = Number(c.total_paid) || 0
+      outstandingSum += Math.max(0, inv - pd)
+      paidSum += pd
+    }
+
+    // Paginate
     const totalCount = mappedClients.length
     const paginatedClients = mappedClients.slice(offset, offset + limit)
 
     return NextResponse.json({
       clients: paginatedClients,
       totalCount,
+      stats: {
+        totalClients: clients.length,
+        outstandingSum,
+        paidSum,
+      },
     })
   } catch (err: any) {
+    console.error("GET /api/clients error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }

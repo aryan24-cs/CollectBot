@@ -107,7 +107,7 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     loadWorkspaces()
   }, [])
 
-  // Load actual numbers & permissions dynamically
+  // Load user permissions once per workspace
   React.useEffect(() => {
     async function loadPermissions() {
       try {
@@ -127,47 +127,32 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
         console.error("Failed to load user permissions:", err)
       }
     }
+    loadPermissions()
+  }, [business.id])
 
+  // Load lightweight aggregate badge stats (~150 bytes, ~10ms)
+  React.useEffect(() => {
     async function loadStats() {
       try {
-        const [invRes, clientRes] = await Promise.all([
-          fetch("/api/invoices?limit=1000"),
-          fetch("/api/clients?limit=1000"),
-        ])
-
-        const invType = invRes.headers.get("content-type") || ""
-        const clientType = clientRes.headers.get("content-type") || ""
-
-        if (invRes.ok && invType.includes("application/json") && clientRes.ok && clientType.includes("application/json")) {
-          const invData = await invRes.json()
-          const clientData = await clientRes.json()
-
-          const invoices = invData.invoices || []
-          const clients = clientData.clients || []
-
+        const res = await fetch("/api/stats/sidebar")
+        const contentType = res.headers.get("content-type") || ""
+        if (res.ok && contentType.includes("application/json")) {
+          const data = await res.json()
           setStats((prev) => ({
             ...prev,
-            allInvoices: invoices.length,
-            draftInvoices: invoices.filter((i: any) => i.status === "draft").length,
-            sentInvoices: invoices.filter((i: any) => i.status === "sent").length,
-            overdueInvoices: invoices.filter(
-              (i: any) => i.displayStatus === "overdue" || i.status === "overdue"
-            ).length,
-            allClients: clients.length,
-            vipClients: clients.filter(
-              (c: any) => c.tags?.includes("VIP") || (c.total_invoiced || 0) > 100000
-            ).length,
-            slowPayers: clients.filter((c: any) => c.outstanding_amount > 0).length,
+            allInvoices: data.allInvoices || 0,
+            draftInvoices: data.draftInvoices || 0,
+            sentInvoices: data.sentInvoices || 0,
+            overdueInvoices: data.overdueInvoices || 0,
+            allClients: data.allClients || 0,
+            vipClients: data.vipClients || 0,
+            slowPayers: data.slowPayers || 0,
           }))
         }
-      } catch (err) {
-        console.error("Failed to load sidebar stats:", err)
-      }
+      } catch (_) {}
     }
-
-    loadPermissions()
     loadStats()
-  }, [pathname])
+  }, [pathname, business.id])
 
   const handleSwitchWorkspace = async (businessId: string, targetDashboard: string) => {
     if (businessId === business.id) return

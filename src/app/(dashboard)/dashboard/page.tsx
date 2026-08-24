@@ -95,188 +95,72 @@ export default function DashboardPage() {
   const loadDashboardData = React.useCallback(async () => {
     setIsLoading(true)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push("/login")
-        return
-      }
-
-      let biz: any = null
-      // Check user profile via backend API (bypasses RLS)
-      const profileRes = await fetch("/api/settings/business")
-      if (profileRes.ok) {
-        const profileData = await profileRes.json()
-        if (profileData.isOwner === false) {
-          const empType = profileData.employee?.employee_type || "FINANCE"
-          const target = 
-            empType === "SALES" ? "/dashboard/sales" :
-            empType === "MARKETING" ? "/dashboard/marketing" :
-            "/dashboard/finance"
-          router.push(target)
+      const res = await fetch("/api/dashboard/overview")
+      const contentType = res.headers.get("content-type") || ""
+      if (!res.ok || !contentType.includes("application/json")) {
+        if (res.status === 401) {
+          router.push("/login")
           return
         }
-        biz = profileData
-        setBusinessName(profileData.name || "Workspace")
-      } else {
-        router.push("/onboarding")
-        return
+        throw new Error("Failed to load dashboard")
       }
+      const data = await res.json()
 
-      // 2. Parallel Fetch Invoices, Clients, Logs, Leads, Campaigns
-      const [
-        { data: invoices },
-        { data: clients },
-        { data: logs },
-        { data: leads },
-        { data: campaigns }
-      ] = await Promise.all([
-        supabase
-          .from("invoices")
-          .select(`
-            id,
-            total,
-            amount_paid,
-            balance_due,
-            status,
-            issue_date,
-            due_date,
-            client_id,
-            client:clients(name, company_name)
-          `)
-          .eq("business_id", biz.id),
-        supabase
-          .from("clients")
-          .select("id, name, total_invoiced, total_paid, company_name")
-          .eq("business_id", biz.id),
-        supabase
-          .from("activity_logs")
-          .select("*")
-          .eq("business_id", biz.id)
-          .order("created_at", { ascending: false })
-          .limit(5),
-        supabase
-          .from("sales_leads")
-          .select("*")
-          .eq("business_id", biz.id)
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("marketing_campaigns")
-          .select("*")
-          .eq("business_id", biz.id)
-          .order("created_at", { ascending: false })
-      ])
-
-      const invoiceList = invoices || []
-      const clientList = clients || []
-      const leadList = leads || []
-      const campaignList = campaigns || []
-
-      setRecentLogs(logs || [])
-      setRecentLeads(leadList.slice(0, 4))
-      setRecentCampaigns(campaignList.slice(0, 4))
-
-      // Compute Sales Stats
-      const totalLeads = leadList.length
-      const wonDeals = leadList.filter(l => l.status === "won").length
-      const lostDeals = leadList.filter(l => l.status === "lost").length
-      const qualifiedLeads = leadList.filter(l => ["qualified", "proposal_sent", "negotiation"].includes(l.status)).length
-      const conversionRate = totalLeads > 0 ? ((wonDeals / totalLeads) * 100).toFixed(1) : "0"
-      const pipelineValue = leadList.reduce((sum, l) => sum + Number(l.value || 0), 0)
-      setSalesStats({
-        totalLeads,
-        qualifiedLeads,
-        wonDeals,
-        lostDeals,
-        conversionRate,
-        pipelineValue
-      })
-      // Fetch Coupons
-      const { data: coupons } = await supabase
-        .from("marketing_coupons")
-        .select("id")
-        .eq("business_id", biz.id)
-        .is("deleted_at", null)
-
-      setMarketingStats({
-        totalCampaigns: campaignList.length,
-        runningCampaigns: campaignList.filter((c: any) => c.status === "scheduled" || c.status === "sending").length,
-        totalCoupons: coupons?.length || 0,
-        averageRoi: "3.5"
-      })
-
-      // 7. Fetch Teammates
-      const { data: teammates } = await supabase
-        .from("employees")
-        .select("id, name, email, employee_type, designation, status, last_login")
-        .eq("business_id", biz.id)
-        .is("deleted_at", null)
-      setEmployees(teammates || [])
-
-      // Compute financial stats
-      let totalInvoiced = 0
-      let totalCollected = 0
-      let outstanding = 0
-      let overdueCount = 0
-      const list = invoices || []
-
-      list.forEach((inv) => {
-        const totalVal = Number(inv.total) || 0
-        const paidVal = Number(inv.amount_paid) || 0
-        const balanceVal = Number(inv.balance_due) || 0
-
-        totalInvoiced += totalVal
-        totalCollected += paidVal
-
-        if (["sent", "viewed", "overdue", "partial"].includes(inv.status)) {
-          outstanding += balanceVal
+      setBusinessName(data.business?.name || "Workspace")
+      setStats(
+        data.stats || {
+          totalInvoiced: 0,
+          totalCollected: 0,
+          outstanding: 0,
+          overdueCount: 0,
+          invoicesCount: 0,
+          clientsCount: 0,
         }
-
-        const daysOver = getDaysOverdue(inv.due_date)
-        if (inv.status === "overdue" || (["sent", "viewed", "partial"].includes(inv.status) && daysOver > 0)) {
-          overdueCount++
+      )
+      setSalesStats(
+        data.salesStats || {
+          totalLeads: 0,
+          qualifiedLeads: 0,
+          wonDeals: 0,
+          lostDeals: 0,
+          conversionRate: "0",
+          pipelineValue: 0,
         }
-      })
-
-      setStats({
-        totalInvoiced,
-        totalCollected,
-        outstanding,
-        overdueCount,
-        invoicesCount: list.length,
-        clientsCount: clients?.length || 0,
-      })
-
-      // Recharts month aggregates
-      const monthlyAggregates: Record<string, { name: string; billed: number; collected: number }> = {}
-      list.forEach(inv => {
-        const d = new Date(inv.issue_date)
-        const monthLabel = d.toLocaleString("default", { month: "short" })
-        if (!monthlyAggregates[monthLabel]) {
-          monthlyAggregates[monthLabel] = { name: monthLabel, billed: 0, collected: 0 }
+      )
+      setMarketingStats(
+        data.marketingStats || {
+          totalCampaigns: 0,
+          runningCampaigns: 0,
+          totalCoupons: 0,
+          averageRoi: "0",
         }
-        monthlyAggregates[monthLabel].billed += Number(inv.total || 0)
-        monthlyAggregates[monthLabel].collected += Number(inv.amount_paid || 0)
-      })
-      setChartData(Object.values(monthlyAggregates))
-      setInvoiceBreakdown(list.slice(0, 5))
+      )
+      setEmployees(data.employees || [])
+      setRecentLogs(data.recentLogs || [])
+      setRecentLeads(data.recentLeads || [])
+      setRecentCampaigns(data.recentCampaigns || [])
+      setChartData(data.chartData || [])
+      setInvoiceBreakdown(data.invoiceBreakdown || [])
 
-      // Top clients
-      const clientStats = (clients || []).slice(0, 4).map((c: any) => ({
+      const totalInvoiced = data.stats?.totalInvoiced || 0
+      const clientStats = (data.topClients || []).map((c: any) => ({
         id: c.id,
         name: c.name,
         company: c.company_name || "Freelancer",
         amount: Number(c.total_invoiced) || 0,
-        percentage: totalInvoiced > 0 ? Number(((Number(c.total_invoiced) / totalInvoiced) * 100).toFixed(1)) : 0
+        percentage:
+          totalInvoiced > 0
+            ? Number(((Number(c.total_invoiced) / totalInvoiced) * 100).toFixed(1))
+            : 0,
       }))
       setTopClients(clientStats)
-
     } catch (err: any) {
+      console.error("Dashboard overview load error:", err)
       toast.error(err.message || "Failed to load dashboard statistics.")
     } finally {
       setIsLoading(false)
     }
-  }, [supabase, router])
+  }, [router])
 
   React.useEffect(() => {
     if (mounted) {

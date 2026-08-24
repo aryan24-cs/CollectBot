@@ -179,11 +179,33 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    if (!invoices) {
-      return NextResponse.json({ invoices: [], totalCount: 0 })
+    // Calculate business summary stats across all non-cancelled invoices
+    let totalInvoiced = 0
+    let collected = 0
+    let outstanding = 0
+    let overdue = 0
+    const todayStr = new Date().toISOString().split("T")[0]
+
+    for (const inv of invoices) {
+      const totalVal = Number(inv.total) || 0
+      const paidVal = Number(inv.amount_paid) || 0
+      const dueVal = Number(inv.balance_due) || 0
+
+      if (inv.status !== "cancelled") {
+        totalInvoiced += totalVal
+        collected += paidVal
+
+        if (["sent", "viewed", "overdue", "partial"].includes(inv.status)) {
+          outstanding += dueVal
+        }
+
+        if (inv.status === "overdue" || (["sent", "viewed", "partial"].includes(inv.status) && inv.due_date && inv.due_date < todayStr)) {
+          overdue += dueVal
+        }
+      }
     }
 
-    // Apply Search in Javascript because client columns are nested
+    // Apply Search
     let filteredInvoices = invoices
     if (search) {
       const s = search.toLowerCase()
@@ -201,6 +223,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       invoices: paginatedInvoices,
       totalCount,
+      stats: {
+        totalInvoiced,
+        collected,
+        outstanding,
+        overdue,
+      },
     })
   } catch (err: any) {
     console.error("GET /api/invoices error:", err)
