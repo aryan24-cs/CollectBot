@@ -1,32 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { generateReceipt } from "@/lib/pdf/generateReceipt"
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Fetch invoice to check ownership and details
-    const { data: invoice, error: invoiceError } = await supabase
+    const { data: invoice, error: invoiceError } = await adminDb
       .from("invoices")
       .select("*, client:clients(id, total_paid)")
       .eq("id", id)
@@ -52,12 +41,10 @@ export async function POST(
     const paidAt = payment_date ? new Date(payment_date).toISOString() : new Date().toISOString()
 
     // 1. Insert manual payment record
-    // Note: DB payment_method is restricted to: 'upi','card','netbanking','wallet','manual','online'
-    // So we use 'manual' and include the details (e.g. Cash/Cheque) in notes
     const methodDetails = payment_method ? ` (${payment_method})` : ""
     const paymentNotes = notes ? `${notes}${methodDetails}` : `Manual payment cleared${methodDetails}`
 
-    const { data: paymentRecord, error: paymentError } = await supabase
+    const { data: paymentRecord, error: paymentError } = await adminDb
       .from("payments")
       .insert({
         invoice_id: id,
@@ -73,52 +60,64 @@ export async function POST(
 
     if (paymentError) throw paymentError
 
-    // 2. Update Invoice: status='paid', amount_paid, balance_due, paid_at
-    const { data: updatedInvoice, error: updateError } = await supabase
+    // 2. Compute new totals
+    const currentPaid = Number(invoice.amount_paid) || 0
+    const newAmountPaid = currentPaid + parsedAmount
+    const totalAmount = Number(invoice.total) || 0
+    const newBalanceDue = Math.max(0, totalAmount - newAmountPaid)
+
+    const isFullyPaid = newBalanceDue <= 0
+    const newStatus = isFullyPaid ? "paid" : "partial"
+
+    // 3. Update Invoice
+    const { data: updatedInvoice, error: updateInvoiceError } = await adminDb
       .from("invoices")
       .update({
-        status: "paid",
-        amount_paid: parsedAmount,
-        balance_due: Math.max(0, Number(invoice.total) - parsedAmount),
-        paid_at: paidAt,
-        reminder_paused: true,
+        amount_paid: newAmountPaid,
+        balance_due: newBalanceDue,
+        status: newStatus,
+        paid_at: isFullyPaid ? paidAt : invoice.paid_at,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select()
       .single()
 
-    if (updateError) throw updateError
+    if (updateInvoiceError) throw updateInvoiceError
 
-    // 3. Update client total_paid
+    // 4. Update Client's total_paid
     if (invoice.client?.id) {
       const currentClientPaid = Number(invoice.client.total_paid) || 0
-      await supabase
+      await adminDb
         .from("clients")
         .update({ total_paid: currentClientPaid + parsedAmount })
         .eq("id", invoice.client.id)
     }
 
-    // 4. Log activity
-    await supabase.from("activity_logs").insert({
-      business_id: business.id,
-      type: "payment_received",
-      description: `Payment of ₹${parsedAmount.toLocaleString("en-IN")} manually cleared for ${invoice.invoice_number}`,
-      metadata: { 
-        invoice_id: id,
-        payment_id: paymentRecord.id,
-        manual: true 
-      },
-    })
-
-    // 5. Generate receipt PDF
-    try {
-      await generateReceipt(id)
-    } catch (pdfErr) {
-      console.error("Receipt compilation failed on manual clearance:", pdfErr)
+    // 5. Generate Receipt in background if fully paid
+    if (isFullyPaid) {
+      try {
+        await generateReceipt(id)
+      } catch (receiptErr) {
+        console.error("Receipt generation warning:", receiptErr)
+      }
     }
 
-    return NextResponse.json({ success: true, invoice: updatedInvoice })
+    // 6. Log Activity
+    await adminDb.from("activity_logs").insert({
+      business_id: business.id,
+      type: "payment_recorded",
+      description: `Recorded payment of ${parsedAmount} for invoice #${invoice.invoice_number}`,
+      metadata: { invoice_id: id, payment_id: paymentRecord.id, amount: parsedAmount },
+    })
+
+    return NextResponse.json({
+      success: true,
+      invoice: updatedInvoice,
+      payment: paymentRecord,
+    })
   } catch (err: any) {
+    console.error("POST /api/invoices/[id]/mark-paid error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { createPaymentLink } from "@/lib/razorpay/createPaymentLink"
 import { renderToBuffer } from "@react-pdf/renderer"
 import React from "react"
@@ -13,28 +14,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // Get the business associated with this user
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id, name")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Fetch the invoice with client, items, and business details
-    const { data: invoice, error: invoiceError } = await supabase
+    const { data: invoice, error: invoiceError } = await adminDb
       .from("invoices")
       .select(`
         *,
@@ -84,7 +72,7 @@ export async function POST(
     const { url, id: paymentLinkId } = paymentLinkData
 
     // Update the invoice status and details
-    const { error: updateError } = await supabase
+    const { error: updateError } = await adminDb
       .from("invoices")
       .update({
         payment_link: url,
@@ -114,7 +102,7 @@ export async function POST(
         )
 
         const fileName = `invoices/${invoice.business.id}/${invoice.id}.pdf`
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await adminDb.storage
           .from("invoices")
           .upload(fileName, pdfBuffer, {
             contentType: "application/pdf",
@@ -124,11 +112,11 @@ export async function POST(
         if (uploadError) {
           console.error("Storage upload failed during Send:", uploadError.message)
         } else {
-          const { data: { publicUrl } } = supabase.storage
+          const { data: { publicUrl } } = adminDb.storage
             .from("invoices")
             .getPublicUrl(fileName)
           
-          await supabase
+          await adminDb
             .from("invoices")
             .update({ pdf_url: publicUrl })
             .eq("id", id)
@@ -140,15 +128,8 @@ export async function POST(
       }
     }
 
-    // Fetch notification settings
-    const { data: settings } = await supabase
-      .from("notification_settings")
-      .select("*")
-      .eq("business_id", invoice.business.id)
-      .maybeSingle()
-
-    const channelWhatsapp = false // Forced false to disable WhatsApp
-    const channelEmail = true // Forced true to ensure email delivery
+    const channelWhatsapp = false
+    const channelEmail = true
     const sentVia: string[] = []
 
     const formattedAmount = `₹${Number(invoice.total).toLocaleString("en-IN")}`
@@ -168,7 +149,7 @@ export async function POST(
 
         if (waResult.success) {
           sentVia.push("whatsapp")
-          await supabase.from("reminder_logs").insert({
+          await adminDb.from("reminder_logs").insert({
             invoice_id: invoice.id,
             business_id: invoice.business.id,
             reminder_type: "invoice_sent",
@@ -176,26 +157,9 @@ export async function POST(
             status: "sent",
             message_content: `WhatsApp notification successfully sent to +91${invoice.client.phone.slice(-10)}`,
           })
-        } else {
-          await supabase.from("reminder_logs").insert({
-            invoice_id: invoice.id,
-            business_id: invoice.business.id,
-            reminder_type: "invoice_sent",
-            channel: "whatsapp",
-            status: "failed",
-            error_message: waResult.error || "Failed to dispatch WhatsApp message via Interakt",
-          })
         }
       } catch (waErr: any) {
         console.error("WhatsApp notification trigger crashed:", waErr)
-        await supabase.from("reminder_logs").insert({
-          invoice_id: invoice.id,
-          business_id: invoice.business.id,
-          reminder_type: "invoice_sent",
-          channel: "whatsapp",
-          status: "failed",
-          error_message: waErr.message || "WhatsApp send call crashed internally",
-        })
       }
     }
 
@@ -223,7 +187,7 @@ export async function POST(
         })
 
         sentVia.push("email")
-        await supabase.from("reminder_logs").insert({
+        await adminDb.from("reminder_logs").insert({
           invoice_id: invoice.id,
           business_id: invoice.business.id,
           reminder_type: "invoice_sent",
@@ -233,19 +197,11 @@ export async function POST(
         })
       } catch (mailErr: any) {
         console.error("Email notification trigger crashed:", mailErr)
-        await supabase.from("reminder_logs").insert({
-          invoice_id: invoice.id,
-          business_id: invoice.business.id,
-          reminder_type: "invoice_sent",
-          channel: "email",
-          status: "failed",
-          error_message: mailErr.message || "Resend email dispatch crashed internally",
-        })
       }
     }
 
     // Log in activity_logs
-    await supabase.from("activity_logs").insert({
+    await adminDb.from("activity_logs").insert({
       business_id: invoice.business.id,
       type: "invoice_sent",
       description: `Invoice "${invoice.invoice_number}" was sent to ${invoice.client.name}. Payment link created.`,
@@ -258,6 +214,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, paymentLink: url, sentVia })
   } catch (err: any) {
+    console.error("POST /api/invoices/[id]/send error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }

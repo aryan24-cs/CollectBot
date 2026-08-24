@@ -18,11 +18,12 @@ import {
   Wallet,
   CheckSquare,
   UserPlus,
-  GitBranch,
   Shield,
-  Receipt,
   Megaphone,
-  Ticket
+  Ticket,
+  Check,
+  Plus,
+  Grid
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import getSupabaseBrowserClient from "@/lib/supabase/client"
@@ -31,8 +32,10 @@ import {
   DropdownMenuContent, 
   DropdownMenuItem, 
   DropdownMenuTrigger,
-  DropdownMenuSeparator
+  DropdownMenuSeparator,
+  DropdownMenuLabel
 } from "@/components/ui/dropdown-menu"
+import { toast } from "sonner"
 
 interface ContextSidebarProps {
   business: {
@@ -42,11 +45,24 @@ interface ContextSidebarProps {
   }
 }
 
+interface UserWorkspaceItem {
+  businessId: string
+  businessName: string
+  businessLogo?: string | null
+  role: "OWNER" | "FINANCE" | "SALES" | "MARKETING"
+  designation?: string | null
+  isOwner: boolean
+  targetDashboard: string
+}
+
 export default function ContextSidebar({ business }: ContextSidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = getSupabaseBrowserClient()
   const [isLoggingOut, setIsLoggingOut] = React.useState(false)
+  const [switchingId, setSwitchingId] = React.useState<string | null>(null)
+  const [allWorkspaces, setAllWorkspaces] = React.useState<UserWorkspaceItem[]>([])
+
   const [stats, setStats] = React.useState({
     allInvoices: 0,
     draftInvoices: 0,
@@ -71,8 +87,24 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
   })
 
   const toggleSection = (key: string) => {
-    setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }))
+    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }))
   }
+
+  // Load all user workspaces for the switcher dropdown
+  React.useEffect(() => {
+    async function loadWorkspaces() {
+      try {
+        const res = await fetch("/api/auth/workspaces")
+        if (res.ok) {
+          const data = await res.json()
+          if (data.workspaces) {
+            setAllWorkspaces(data.workspaces)
+          }
+        }
+      } catch (_) {}
+    }
+    loadWorkspaces()
+  }, [])
 
   // Load actual numbers & permissions dynamically
   React.useEffect(() => {
@@ -98,7 +130,7 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
       try {
         const [invRes, clientRes] = await Promise.all([
           fetch("/api/invoices?limit=1000"),
-          fetch("/api/clients?limit=1000")
+          fetch("/api/clients?limit=1000"),
         ])
 
         if (invRes.ok && clientRes.ok) {
@@ -108,14 +140,18 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
           const invoices = invData.invoices || []
           const clients = clientData.clients || []
 
-          setStats(prev => ({
+          setStats((prev) => ({
             ...prev,
             allInvoices: invoices.length,
             draftInvoices: invoices.filter((i: any) => i.status === "draft").length,
             sentInvoices: invoices.filter((i: any) => i.status === "sent").length,
-            overdueInvoices: invoices.filter((i: any) => i.displayStatus === "overdue" || i.status === "overdue").length,
+            overdueInvoices: invoices.filter(
+              (i: any) => i.displayStatus === "overdue" || i.status === "overdue"
+            ).length,
             allClients: clients.length,
-            vipClients: clients.filter((c: any) => c.tags?.includes("VIP") || (c.total_invoiced || 0) > 100000).length,
+            vipClients: clients.filter(
+              (c: any) => c.tags?.includes("VIP") || (c.total_invoiced || 0) > 100000
+            ).length,
             slowPayers: clients.filter((c: any) => c.outstanding_amount > 0).length,
           }))
         }
@@ -123,10 +159,33 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
         console.error("Failed to load sidebar stats:", err)
       }
     }
-    
+
     loadPermissions()
     loadStats()
   }, [pathname])
+
+  const handleSwitchWorkspace = async (businessId: string, targetDashboard: string) => {
+    if (businessId === business.id) return
+
+    setSwitchingId(businessId)
+    try {
+      const res = await fetch("/api/auth/switch-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ businessId }),
+      })
+
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || "Failed to switch workspace")
+
+      toast.success(`Switched to ${data.businessName || "Workspace"}`)
+      router.push(data.destination || targetDashboard || "/dashboard")
+      router.refresh()
+    } catch (err: any) {
+      toast.error(err.message || "Failed to switch workspace")
+      setSwitchingId(null)
+    }
+  }
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -142,38 +201,28 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
   }
 
   const isTabActive = (href: string) => pathname === href || pathname.startsWith(href + "/")
-  
-  const hasAccess = (category: string, action: string = "view") => {
-    if (permissions.includes("all") || isOwner) return true
-    return permissions.includes(`${category}:${action}`)
-  }
 
-  const isSectionVisible = (section: string) => {
-    if (employeeType === "OWNER") return true
-    if (employeeType === "FINANCE") {
-      return ["dashboard", "invoices", "expenses", "tasks", "reminders", "approvals"].includes(section)
-    }
-    if (employeeType === "SALES") {
-      return ["dashboard", "sales", "clients", "tasks"].includes(section)
-    }
-    if (employeeType === "MARKETING") {
-      return ["dashboard", "marketing", "clients", "tasks"].includes(section)
-    }
-    return false
-  }
-
-  const dashboardHref = 
-    employeeType === "FINANCE" ? "/dashboard/finance" :
-    employeeType === "SALES" ? "/dashboard/sales" :
-    employeeType === "MARKETING" ? "/dashboard/marketing" :
-    "/dashboard"
+  const dashboardHref =
+    employeeType === "FINANCE"
+      ? "/dashboard/finance"
+      : employeeType === "SALES"
+      ? "/dashboard/sales"
+      : employeeType === "MARKETING"
+      ? "/dashboard/marketing"
+      : "/dashboard"
 
   // Helper component for a nav link
-  const NavLink = ({ href, icon: Icon, label, badge, badgeVariant = "default" }: { 
-    href: string; 
-    icon: any; 
-    label: string; 
-    badge?: number | string;
+  const NavLink = ({
+    href,
+    icon: Icon,
+    label,
+    badge,
+    badgeVariant = "default",
+  }: {
+    href: string
+    icon: any
+    label: string
+    badge?: number | string
     badgeVariant?: "default" | "danger"
   }) => (
     <Link
@@ -190,12 +239,14 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
         <span>{label}</span>
       </div>
       {badge !== undefined && badge !== 0 && (
-        <span className={cn(
-          "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
-          badgeVariant === "danger"
-            ? "bg-[#FFEBEE] text-[#C62828]"
-            : "bg-cream-200 text-ink-secondary"
-        )}>
+        <span
+          className={cn(
+            "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+            badgeVariant === "danger"
+              ? "bg-[#FFEBEE] text-[#C62828]"
+              : "bg-cream-200 text-ink-secondary"
+          )}
+        >
           {badge}
         </span>
       )}
@@ -209,18 +260,25 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
       className="flex items-center justify-between w-full px-3 py-1.5 text-[9px] font-bold tracking-widest uppercase text-ink-muted hover:text-ink-secondary transition-colors cursor-pointer"
     >
       <span>{label}</span>
-      <ChevronRight className={cn(
-        "w-3 h-3 transition-transform duration-200",
-        expandedSections[sectionKey] && "rotate-90"
-      )} />
+      <ChevronRight
+        className={cn(
+          "w-3 h-3 transition-transform duration-200",
+          expandedSections[sectionKey] && "rotate-90"
+        )}
+      />
     </button>
   )
 
   // Helper: inline sub-link
-  const SubLink = ({ href, label, badge, badgeVariant = "default" }: { 
-    href: string; 
-    label: string; 
-    badge?: number | string;
+  const SubLink = ({
+    href,
+    label,
+    badge,
+    badgeVariant = "default",
+  }: {
+    href: string
+    label: string
+    badge?: number | string
     badgeVariant?: "default" | "danger"
   }) => (
     <Link
@@ -234,12 +292,14 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     >
       <span>{label}</span>
       {badge !== undefined && badge !== 0 && (
-        <span className={cn(
-          "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
-          badgeVariant === "danger"
-            ? "bg-[#FFEBEE] text-[#C62828]"
-            : "bg-cream-200/80 text-ink-muted"
-        )}>
+        <span
+          className={cn(
+            "px-1.5 py-0.5 rounded-full text-[9px] font-bold leading-none",
+            badgeVariant === "danger"
+              ? "bg-[#FFEBEE] text-[#C62828]"
+              : "bg-cream-200/80 text-ink-muted"
+          )}
+        >
           {badge}
         </span>
       )}
@@ -256,39 +316,106 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     <div className="w-64 flex-shrink-0 flex flex-col h-screen sticky top-0 bg-[#F5F1EE] border-r border-[#EEE9E4] select-none py-5 px-3 justify-between">
       {/* Top Section */}
       <div className="space-y-4 overflow-y-auto pr-0.5 scrollbar-thin flex-1">
-        
         {/* Brand Header */}
         <div className="flex items-center gap-2.5 px-2 mb-1">
           <div className="w-8 h-8 rounded-full bg-[#1A1A1A] flex items-center justify-center text-sm font-extrabold text-white shadow-soft">
             C
           </div>
-          <span className="text-sm font-extrabold text-[#0A0A0A] tracking-tight">CollectBot</span>
+          <span className="text-sm font-extrabold text-[#0A0A0A] tracking-tight font-display">CollectBot OS</span>
         </div>
 
-        {/* Business Selector Dropdown */}
+        {/* Business Selector Dropdown with Multi-Workspace Switching */}
         <div className="px-0.5">
           <DropdownMenu>
-            <DropdownMenuTrigger className="flex items-center gap-2.5 hover:bg-cream-200/50 p-2.5 rounded-lg transition-all cursor-pointer w-full text-left focus:outline-none border border-[#EEE9E4]/50 bg-white/40">
+            <DropdownMenuTrigger className="flex items-center gap-2.5 hover:bg-cream-200/50 p-2.5 rounded-lg transition-all cursor-pointer w-full text-left focus:outline-none border border-[#EEE9E4]/50 bg-white/40 shadow-soft">
               <div className="w-7 h-7 rounded-lg bg-[#E91E63]/10 flex items-center justify-center border border-[#E91E63]/20 shrink-0 text-[#E91E63] font-extrabold text-xs">
-                {business.name.charAt(0).toUpperCase()}
+                {business.logo_url ? (
+                  <img src={business.logo_url} alt={business.name} className="w-full h-full object-cover rounded-lg" />
+                ) : (
+                  business.name.charAt(0).toUpperCase()
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-ink-primary truncate">{business.name}</p>
-                <p className="text-[9px] text-ink-secondary truncate">{isOwner ? "Owner" : `${employeeType} Dept`}</p>
+                <p className="text-[9px] text-ink-secondary truncate">
+                  {isOwner ? "Business Owner" : `${employeeType} Member`}
+                </p>
               </div>
               <ChevronDown className="w-3 h-3 text-ink-secondary shrink-0" />
             </DropdownMenuTrigger>
-            
-            <DropdownMenuContent className="w-52 bg-white border border-surface-border rounded-xl shadow-floating z-50">
+
+            <DropdownMenuContent className="w-60 bg-white border border-[#EEE9E4] rounded-xl shadow-floating z-50 p-1.5">
+              {allWorkspaces.length > 1 && (
+                <>
+                  <DropdownMenuLabel className="text-[9px] font-bold tracking-wider uppercase text-ink-muted px-2 py-1">
+                    Switch Workspace
+                  </DropdownMenuLabel>
+                  <div className="max-h-48 overflow-y-auto space-y-0.5">
+                    {allWorkspaces.map((ws) => {
+                      const isActive = ws.businessId === business.id
+                      return (
+                        <DropdownMenuItem
+                          key={ws.businessId}
+                          onClick={() => handleSwitchWorkspace(ws.businessId, ws.targetDashboard)}
+                          disabled={switchingId !== null}
+                          className={cn(
+                            "flex items-center justify-between p-2 rounded-lg cursor-pointer text-xs font-semibold",
+                            isActive ? "bg-cream-100 text-ink-primary font-bold" : "text-ink-secondary hover:bg-cream-50"
+                          )}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <div className="w-5 h-5 rounded bg-cream-200 flex items-center justify-center text-[10px] font-bold text-ink-primary shrink-0">
+                              {ws.businessName.charAt(0).toUpperCase()}
+                            </div>
+                            <span className="truncate">{ws.businessName}</span>
+                          </div>
+                          {isActive ? (
+                            <Check className="w-3.5 h-3.5 text-[#E91E63] shrink-0" />
+                          ) : (
+                            <span className="text-[9px] text-ink-muted uppercase font-bold">{ws.role}</span>
+                          )}
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </div>
+                  <DropdownMenuSeparator className="bg-[#EEE9E4]/60 my-1" />
+                </>
+              )}
+
+              <DropdownMenuItem
+                onClick={() => router.push("/select-workspace")}
+                className="cursor-pointer text-xs font-semibold py-2 text-ink-primary"
+              >
+                <Grid className="w-3.5 h-3.5 mr-2 text-ink-muted" />
+                All Workspaces Grid
+              </DropdownMenuItem>
+
               {showWorkspaceSection && (
-                <DropdownMenuItem onClick={() => router.push("/settings")} className="cursor-pointer text-xs font-semibold py-2">
-                  <Building className="w-4 h-4 mr-2 text-ink-secondary" />
+                <DropdownMenuItem
+                  onClick={() => router.push("/settings")}
+                  className="cursor-pointer text-xs font-semibold py-2 text-ink-primary"
+                >
+                  <Building className="w-3.5 h-3.5 mr-2 text-ink-muted" />
                   Business Settings
                 </DropdownMenuItem>
               )}
-              <DropdownMenuSeparator className="bg-surface-border/50" />
-              <DropdownMenuItem onClick={handleLogout} disabled={isLoggingOut} className="cursor-pointer text-xs font-semibold py-2 text-danger">
-                <LogOut className="w-4 h-4 mr-2" />
+
+              <DropdownMenuItem
+                onClick={() => router.push("/onboarding")}
+                className="cursor-pointer text-xs font-semibold py-2 text-ink-primary"
+              >
+                <Plus className="w-3.5 h-3.5 mr-2 text-[#E91E63]" />
+                Add Another Business
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-[#EEE9E4]/60 my-1" />
+
+              <DropdownMenuItem
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="cursor-pointer text-xs font-semibold py-2 text-danger hover:bg-danger-light"
+              >
+                <LogOut className="w-3.5 h-3.5 mr-2" />
                 {isLoggingOut ? "Signing out..." : "Sign Out"}
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -340,7 +467,12 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
                   <div className="ml-7 pl-3 border-l border-[#EEE9E4] mt-1 mb-1 space-y-0.5">
                     <SubLink href="/invoices?status=draft" label="Drafts" badge={stats.draftInvoices || undefined} />
                     <SubLink href="/invoices?status=sent" label="Sent" badge={stats.sentInvoices || undefined} />
-                    <SubLink href="/invoices?status=overdue" label="Overdue" badge={stats.overdueInvoices || undefined} badgeVariant="danger" />
+                    <SubLink
+                      href="/invoices?status=overdue"
+                      label="Overdue"
+                      badge={stats.overdueInvoices || undefined}
+                      badgeVariant="danger"
+                    />
                   </div>
                 )}
                 <NavLink href="/expenses" icon={Wallet} label="Expenses" />
@@ -366,16 +498,19 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
             )}
           </div>
         )}
-
       </div>
 
       {/* Bottom: Quick help / keyboard shortcut hint */}
       <div className="pt-3 border-t border-[#EEE9E4]/60 mt-2 px-1">
         <div className="flex items-center gap-2 text-[10px] text-ink-muted px-2 py-1.5">
-          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">N</kbd>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">
+            N
+          </kbd>
           <span>New Item</span>
           <span className="text-[#EEE9E4]">·</span>
-          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">C</kbd>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-[#EEE9E4] text-[9px] font-mono font-bold text-ink-secondary shadow-sm">
+            C
+          </kbd>
           <span>New Client</span>
         </div>
       </div>

@@ -1,26 +1,17 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 
 export async function POST(request: NextRequest) {
+  const { error: authError, business, role } = await requireBusinessUser(request)
+  if (authError) return authError
+
+  if (role !== "OWNER") {
+    return NextResponse.json({ error: "Only the business owner can upload a workspace logo" }, { status: 403 })
+  }
+
   try {
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    // 1. Get business profile
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found" }, { status: 400 })
-    }
-
+    const adminDb = getSupabaseServiceRoleClient()
     const formData = await request.formData()
     const file = formData.get("file") as File | null
 
@@ -28,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // 2. Validate file type & size (max 2MB)
+    // Validate file type & size (max 2MB)
     const allowedTypes = ["image/jpeg", "image/png", "image/svg+xml"]
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
@@ -45,13 +36,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 3. Prepare upload parameters
+    // Upload parameters
     const fileBuffer = Buffer.from(await file.arrayBuffer())
     const fileExt = file.name.split(".").pop() || "png"
     const filePath = `logos/${business.id}.${fileExt}`
 
-    // 4. Upload to invoices bucket (under logos/ subdirectory)
-    const { error: uploadError } = await supabase.storage
+    // Upload to invoices bucket (under logos/ subdirectory)
+    const { error: uploadError } = await adminDb.storage
       .from("invoices")
       .upload(filePath, fileBuffer, {
         contentType: file.type,
@@ -59,25 +50,32 @@ export async function POST(request: NextRequest) {
       })
 
     if (uploadError) {
-      throw new Error(`Storage upload failed: ${uploadError.message}`)
+      console.error("Storage logo upload error:", uploadError)
+      return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 })
     }
 
-    // 5. Retrieve public URL
-    const { data: { publicUrl } } = supabase.storage
+    // Get public URL
+    const { data: { publicUrl } } = adminDb.storage
       .from("invoices")
       .getPublicUrl(filePath)
 
-    // 6. Update business logo URL in DB
-    const { error: dbError } = await supabase
+    // Save publicUrl to businesses table
+    const { error: updateError } = await adminDb
       .from("businesses")
-      .update({ logo_url: publicUrl })
+      .update({
+        logo_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", business.id)
 
-    if (dbError) throw dbError
+    if (updateError) throw updateError
 
-    return NextResponse.json({ success: true, logoUrl: publicUrl })
+    return NextResponse.json({
+      success: true,
+      logo_url: publicUrl,
+    })
   } catch (err: any) {
-    console.error("Logo upload handler crashed:", err)
-    return NextResponse.json({ error: err.message || "Failed to upload logo." }, { status: 500 })
+    console.error("POST /api/settings/logo error:", err)
+    return NextResponse.json({ error: err.message || "Failed to process logo upload." }, { status: 500 })
   }
 }

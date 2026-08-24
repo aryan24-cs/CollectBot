@@ -1,32 +1,21 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { invoiceSchema } from "@/lib/validations/invoice"
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Fetch invoice details
-    const { data: invoice, error: invoiceError } = await supabase
+    const { data: invoice, error: invoiceError } = await adminDb
       .from("invoices")
       .select(`
         *,
@@ -46,6 +35,7 @@ export async function GET(
 
     return NextResponse.json(invoice)
   } catch (err: any) {
+    console.error("GET /api/invoices/[id] error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }
@@ -54,40 +44,31 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    const adminDb = getSupabaseServiceRoleClient()
 
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
-
-    // Fetch existing invoice to verify status
-    const { data: existingInvoice, error: fetchError } = await supabase
+    // 1. Fetch existing invoice
+    const { data: existingInvoice } = await adminDb
       .from("invoices")
-      .select("status, client_id, total")
+      .select("*, items:invoice_items(*)")
       .eq("id", id)
       .eq("business_id", business.id)
       .maybeSingle()
 
-    if (fetchError || !existingInvoice) {
+    if (!existingInvoice) {
       return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
     }
 
-    // ONLY allow editing drafts
-    if (existingInvoice.status !== "draft") {
-      return NextResponse.json({ error: "Only invoices in 'draft' status can be modified." }, { status: 400 })
+    // Block edit if invoice is paid or cancelled
+    if (existingInvoice.status === "paid" || existingInvoice.status === "cancelled") {
+      return NextResponse.json(
+        { error: `Cannot edit an invoice that is already marked as ${existingInvoice.status}.` },
+        { status: 400 }
+      )
     }
 
     const body = await request.json()
@@ -99,20 +80,25 @@ export async function PUT(
 
     const { client_id, invoice_number, issue_date, due_date, discount, notes, terms, is_recurring, items } = validation.data
 
-    // Check duplicate invoice numbers
-    const { data: duplicateNum } = await supabase
-      .from("invoices")
-      .select("id")
-      .eq("business_id", business.id)
-      .eq("invoice_number", invoice_number)
-      .neq("id", id)
-      .maybeSingle()
+    // Check uniqueness of invoice number if changed
+    if (invoice_number !== existingInvoice.invoice_number) {
+      const { data: dupCheck } = await adminDb
+        .from("invoices")
+        .select("id")
+        .eq("business_id", business.id)
+        .eq("invoice_number", invoice_number)
+        .neq("id", id)
+        .maybeSingle()
 
-    if (duplicateNum) {
-      return NextResponse.json({ error: "Invoice number already in use." }, { status: 400 })
+      if (dupCheck) {
+        return NextResponse.json(
+          { error: "Invoice number already exists. Please choose a different one." },
+          { status: 400 }
+        )
+      }
     }
 
-    // Recalculate totals server-side
+    // 2. Recalculate totals
     let subtotal = 0
     let tax_amount = 0
 
@@ -127,7 +113,6 @@ export async function PUT(
       tax_amount += taxVal
 
       return {
-        invoice_id: id,
         description: item.description,
         quantity: qty,
         rate: rate,
@@ -139,10 +124,11 @@ export async function PUT(
     })
 
     const total = Math.max(0, subtotal + tax_amount - Number(discount || 0))
-    const balance_due = total
+    const amount_paid = Number(existingInvoice.amount_paid) || 0
+    const balance_due = Math.max(0, total - amount_paid)
 
-    // Update Invoice record
-    const { data: updatedInvoice, error: updateError } = await supabase
+    // 3. Update Invoice record
+    const { data: updatedInvoice, error: updateError } = await adminDb
       .from("invoices")
       .update({
         client_id,
@@ -157,6 +143,7 @@ export async function PUT(
         notes: notes || null,
         terms: terms || null,
         is_recurring: is_recurring || false,
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select()
@@ -164,115 +151,56 @@ export async function PUT(
 
     if (updateError) throw updateError
 
-    // Recreate Invoice Items: Delete old and insert new
-    await supabase.from("invoice_items").delete().eq("invoice_id", id)
-    const { error: itemsError } = await supabase.from("invoice_items").insert(preparedItems)
+    // 4. Replace line items: Delete old -> Insert new
+    await adminDb
+      .from("invoice_items")
+      .delete()
+      .eq("invoice_id", id)
 
-    if (itemsError) throw itemsError
+    const itemsToInsert = preparedItems.map((item) => ({
+      ...item,
+      invoice_id: id,
+    }))
 
-    // Manage Recurring Schedules
-    if (is_recurring) {
-      const scheduleFreq = body.recurring_frequency || "monthly"
-      const scheduleStart = body.recurring_start_date || issue_date
-      const scheduleEnd = body.recurring_end_date || null
+    const { error: itemsInsertError } = await adminDb
+      .from("invoice_items")
+      .insert(itemsToInsert)
 
-      const templateData = {
-        discount: Number(discount || 0),
-        notes: notes || "",
-        terms: terms || "",
-        items: preparedItems.map(it => ({
-          description: it.description,
-          quantity: it.quantity,
-          rate: it.rate,
-          tax_rate: it.tax_rate
-        }))
-      }
+    if (itemsInsertError) throw itemsInsertError
 
-      // Check if schedule already exists for this invoice
-      const { data: existingSchedule } = await supabase
-        .from("recurring_schedules")
-        .select("id")
-        .eq("invoice_id", id)
-        .maybeSingle()
-
-      if (existingSchedule) {
-        // Update existing schedule
-        await supabase
-          .from("recurring_schedules")
-          .update({
-            client_id: client_id,
-            frequency: scheduleFreq,
-            next_invoice_date: scheduleStart,
-            end_date: scheduleEnd,
-            template_data: templateData,
-          })
-          .eq("id", existingSchedule.id)
-      } else {
-        // Insert new schedule
-        await supabase
-          .from("recurring_schedules")
-          .insert({
-            business_id: business.id,
-            client_id: client_id,
-            frequency: scheduleFreq,
-            next_invoice_date: scheduleStart,
-            end_date: scheduleEnd,
-            template_data: templateData,
-            is_active: true,
-            invoice_id: id
-          })
-      }
-    } else {
-      // Delete any existing schedule if toggled off
-      await supabase
-        .from("recurring_schedules")
-        .delete()
-        .eq("invoice_id", id)
-    }
-
-    // Adjust client aggregates total_invoiced statistic
-    if (existingInvoice.client_id) {
-      const { data: oldClient } = await supabase
+    // 5. Update client's total_invoiced delta
+    const delta = total - Number(existingInvoice.total)
+    if (delta !== 0 && client_id) {
+      const { data: client } = await adminDb
         .from("clients")
         .select("total_invoiced")
-        .eq("id", existingInvoice.client_id)
-        .maybeSingle()
-      if (oldClient) {
-        const oldVal = Number(oldClient.total_invoiced) || 0
-        await supabase
-          .from("clients")
-          .update({ total_invoiced: Math.max(0, oldVal - existingInvoice.total) })
-          .eq("id", existingInvoice.client_id)
-      }
-    }
-
-    const { data: newClient } = await supabase
-      .from("clients")
-      .select("total_invoiced")
-      .eq("id", client_id)
-      .maybeSingle()
-
-    if (newClient) {
-      const newVal = Number(newClient.total_invoiced) || 0
-      await supabase
-        .from("clients")
-        .update({ total_invoiced: newVal + total })
         .eq("id", client_id)
+        .single()
+
+      if (client) {
+        await adminDb
+          .from("clients")
+          .update({
+            total_invoiced: Number(client.total_invoiced || 0) + delta,
+          })
+          .eq("id", client_id)
+      }
     }
 
     // Log Activity
-    await supabase.from("activity_logs").insert({
+    await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "invoice_updated",
-      description: `Invoice "${invoice_number}" details were updated.`,
-      metadata: { invoice_id: id },
+      description: `Invoice ${invoice_number} was updated. New total: ${total}`,
+      metadata: { invoice_id: id, total },
     })
 
     return NextResponse.json({
       ...updatedInvoice,
-      items: preparedItems,
+      items: itemsToInsert,
     })
   } catch (err: any) {
+    console.error("PUT /api/invoices/[id] error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }
@@ -281,27 +209,15 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Fetch existing invoice to check status
-    const { data: invoice } = await supabase
+    const { data: invoice } = await adminDb
       .from("invoices")
       .select("status, client_id, total")
       .eq("id", id)
@@ -314,19 +230,22 @@ export async function DELETE(
 
     // ONLY allow delete if 'draft' or 'cancelled'
     if (invoice.status !== "draft" && invoice.status !== "cancelled") {
-      return NextResponse.json({ error: "Only invoices in 'draft' or 'cancelled' status can be deleted." }, { status: 400 })
+      return NextResponse.json(
+        { error: "Only invoices in 'draft' or 'cancelled' status can be deleted." },
+        { status: 400 }
+      )
     }
 
     // Subtract from client's total_invoiced
     if (invoice.client_id) {
-      const { data: client } = await supabase
+      const { data: client } = await adminDb
         .from("clients")
         .select("total_invoiced")
         .eq("id", invoice.client_id)
         .maybeSingle()
       if (client) {
         const currentTotal = Number(client.total_invoiced) || 0
-        await supabase
+        await adminDb
           .from("clients")
           .update({ total_invoiced: Math.max(0, currentTotal - invoice.total) })
           .eq("id", invoice.client_id)
@@ -334,7 +253,7 @@ export async function DELETE(
     }
 
     // Hard delete (cascade deletes invoice_items)
-    const { error: deleteError } = await supabase
+    const { error: deleteError } = await adminDb
       .from("invoices")
       .delete()
       .eq("id", id)
@@ -342,7 +261,7 @@ export async function DELETE(
     if (deleteError) throw deleteError
 
     // Log Activity
-    await supabase.from("activity_logs").insert({
+    await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "invoice_deleted",
       description: `Invoice ID ${id} was deleted.`,
@@ -351,6 +270,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
+    console.error("DELETE /api/invoices/[id] error:", err)
     return NextResponse.json({ error: err.message || "Something went wrong" }, { status: 500 })
   }
 }

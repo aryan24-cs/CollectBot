@@ -24,7 +24,9 @@ export async function verifyAdminAccess(): Promise<{
 
     try {
       const supabase = await getSupabaseServerClient()
-      const { data: { user: serverUser } } = await supabase.auth.getUser()
+      const {
+        data: { user: serverUser },
+      } = await supabase.auth.getUser()
       user = serverUser
     } catch (_) {}
 
@@ -32,12 +34,14 @@ export async function verifyAdminAccess(): Promise<{
       try {
         const cookieStore = await cookies()
         const allCookies = cookieStore.getAll()
-        const authCookie = allCookies.find(c => c.name.includes("auth-token"))
+        const authCookie = allCookies.find((c) => c.name.includes("auth-token"))
         if (authCookie?.value) {
           const parsed = JSON.parse(authCookie.value)
           const token = Array.isArray(parsed) ? parsed[0] : parsed.access_token
           if (token) {
-            const { data: { user: tokenUser } } = await serviceClient.auth.getUser(token)
+            const {
+              data: { user: tokenUser },
+            } = await serviceClient.auth.getUser(token)
             user = tokenUser
           }
         }
@@ -53,7 +57,7 @@ export async function verifyAdminAccess(): Promise<{
       role: "super_admin",
       is_active: true,
       created_at: new Date().toISOString(),
-      last_login: new Date().toISOString()
+      last_login: new Date().toISOString(),
     }
 
     if (!user || user.email === "aryan.nda.2163@gmail.com") {
@@ -79,7 +83,18 @@ export async function verifyAdminAccess(): Promise<{
 }
 
 export async function logAdminAction(
-  actionOrObj: string | { adminId?: string; action: string; targetType?: string; targetId?: string; description?: string; details?: Record<string, any>; oldValue?: any; newValue?: any },
+  actionOrObj:
+    | string
+    | {
+        adminId?: string
+        action: string
+        targetType?: string
+        targetId?: string
+        description?: string
+        details?: Record<string, any>
+        oldValue?: any
+        newValue?: any
+      },
   targetType?: string,
   targetId?: string,
   details?: Record<string, any>,
@@ -87,35 +102,43 @@ export async function logAdminAction(
 ) {
   try {
     const supabase = getSupabaseServiceRoleClient()
-    
+
     let act = ""
     let tType: string | null = null
     let tId: string | null = null
-    let aId = "admin-fallback-id"
-    let dt: Record<string, any> = {}
+    let aId = "63296a4b-1f35-4f03-8dcf-cbca90e8639d" // Fallback admin UUID for foreign key integrity
+    let desc = "Admin action executed"
+    let oldVal: any = null
+    let newVal: any = null
 
     if (typeof actionOrObj === "object" && actionOrObj !== null) {
       act = actionOrObj.action || "admin_action"
       tType = actionOrObj.targetType || null
-      tId = actionOrObj.targetId || null
-      aId = actionOrObj.adminId || "admin-fallback-id"
-      dt = actionOrObj.details || { description: actionOrObj.description, oldValue: actionOrObj.oldValue, newValue: actionOrObj.newValue }
+      tId = actionOrObj.targetId ? String(actionOrObj.targetId) : null
+      if (actionOrObj.adminId && actionOrObj.adminId.length > 20) {
+        aId = actionOrObj.adminId
+      }
+      desc = actionOrObj.description || `Admin performed ${act}`
+      oldVal = actionOrObj.oldValue || null
+      newVal = actionOrObj.newValue || actionOrObj.details || null
     } else {
       act = actionOrObj
       tType = targetType || null
-      tId = targetId || null
-      aId = adminId || "admin-fallback-id"
-      dt = details || {}
+      tId = targetId ? String(targetId) : null
+      if (adminId && adminId.length > 20) aId = adminId
+      desc = `Admin action ${act} executed`
+      newVal = details || null
     }
 
-    await supabase.from("admin_audit_logs").insert({
+    await supabase.from("admin_activity_logs").insert({
       admin_id: aId,
       action: act,
       target_type: tType,
       target_id: tId,
-      details: dt,
+      description: desc,
+      old_value: oldVal,
+      new_value: newVal,
       ip_address: "127.0.0.1",
-      user_agent: "CollectBot Platform System",
     })
   } catch (err) {
     console.error("Failed to log admin action:", err)

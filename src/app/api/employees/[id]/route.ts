@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { requireBusinessUser } from "@/lib/auth/checkRole"
 
@@ -7,8 +6,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error, user, business } = await requireBusinessUser(request)
+  const { error, user, business, role } = await requireBusinessUser(request)
   if (error) return error
+
+  if (role !== "OWNER") {
+    return NextResponse.json({ error: "Only the business owner can update employee records" }, { status: 403 })
+  }
 
   try {
     const { id } = await params
@@ -40,19 +43,18 @@ export async function PUT(
       .maybeSingle()
 
     if (!employeeCheck) {
-      return NextResponse.json({ error: "Employee not found" }, { status: 404 })
+      return NextResponse.json({ error: "Employee not found in this business" }, { status: 404 })
     }
 
     // Handle password reset
     if (new_password && new_password.trim().length >= 6) {
-      if (!employeeCheck.user_id) {
-        return NextResponse.json({ error: "Cannot reset password: Employee account has no linked login credentials." }, { status: 400 })
-      }
-      const { error: resetError } = await adminDb.auth.admin.updateUserById(employeeCheck.user_id, {
-        password: new_password.trim()
-      })
-      if (resetError) {
-        return NextResponse.json({ error: `Password Reset Failed: ${resetError.message}` }, { status: 400 })
+      if (employeeCheck.user_id) {
+        const { error: resetError } = await adminDb.auth.admin.updateUserById(employeeCheck.user_id, {
+          password: new_password.trim(),
+        })
+        if (resetError) {
+          return NextResponse.json({ error: `Password Reset Failed: ${resetError.message}` }, { status: 400 })
+        }
       }
     }
 
@@ -70,11 +72,13 @@ export async function PUT(
     if (profile_picture_url !== undefined) updates.profile_picture_url = profile_picture_url || null
 
     updates.updated_at = new Date().toISOString()
+    updates.updated_by = user.id
 
     const { data: employee, error: updateError } = await adminDb
       .from("employees")
       .update(updates)
       .eq("id", id)
+      .eq("business_id", business.id)
       .select()
       .single()
 
@@ -105,7 +109,7 @@ export async function PUT(
       business_id: business.id,
       type: "employee_updated",
       description: `Updated employee profile details for "${employee.name}".`,
-      metadata: { employee_id: id, updates }
+      metadata: { employee_id: id, updates },
     })
 
     return NextResponse.json({ success: true, employee })
@@ -118,20 +122,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error, user, business } = await requireBusinessUser(request)
+  const { error, business, role } = await requireBusinessUser(request)
   if (error) return error
 
-  // Only the business owner can delete employees
-  const supabase = await getSupabaseServerClient()
-  const { data: ownerCheck } = await supabase
-    .from("businesses")
-    .select("id")
-    .eq("id", business.id)
-    .eq("user_id", user.id)
-    .maybeSingle()
-
-  if (!ownerCheck) {
-    return NextResponse.json({ error: "Only the business owner can delete employees" }, { status: 403 })
+  // Only the business owner can remove employees
+  if (role !== "OWNER") {
+    return NextResponse.json({ error: "Only the business owner can remove employees from this workspace" }, { status: 403 })
   }
 
   try {
@@ -147,19 +143,16 @@ export async function DELETE(
       .maybeSingle()
 
     if (!employeeCheck) {
-      return NextResponse.json({ error: "Employee not found" }, { status: 404 })
+      return NextResponse.json({ error: "Employee not found in this workspace" }, { status: 404 })
     }
 
-    // Delete auth user via admin supabase if registered
-    if (employeeCheck.user_id) {
-      await adminDb.auth.admin.deleteUser(employeeCheck.user_id)
-    }
-
-    // Delete employee record
+    // Safely remove employee membership ONLY for this business.
+    // NEVER delete the global auth user (user may belong to other business workspaces).
     const { error: deleteError } = await adminDb
       .from("employees")
       .delete()
       .eq("id", id)
+      .eq("business_id", business.id)
 
     if (deleteError) throw deleteError
 
@@ -167,11 +160,11 @@ export async function DELETE(
     await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "employee_deleted",
-      description: `Permanently removed employee "${employeeCheck.name}" from workspace.`,
-      metadata: { employee_id: id }
+      description: `Removed "${employeeCheck.name}" from workspace.`,
+      metadata: { employee_id: id },
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: "Employee removed from workspace successfully" })
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to delete employee" }, { status: 500 })
   }

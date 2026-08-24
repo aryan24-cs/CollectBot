@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import getSupabaseServerClient from "@/lib/supabase/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { requireBusinessUser } from "@/lib/auth/checkRole"
 import { renderToBuffer } from "@react-pdf/renderer"
 import React from "react"
 import InvoiceDocument from "@/lib/pdf/InvoiceDocument"
@@ -9,27 +10,15 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error: authError, business } = await requireBusinessUser(request)
+  if (authError) return authError
+
   try {
     const { id } = await params
-    const supabase = await getSupabaseServerClient()
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-    }
-
-    const { data: business } = await supabase
-      .from("businesses")
-      .select("id")
-      .eq("user_id", user.id)
-      .maybeSingle()
-
-    if (!business) {
-      return NextResponse.json({ error: "Business profile not found." }, { status: 400 })
-    }
+    const adminDb = getSupabaseServiceRoleClient()
 
     // Fetch Invoice details
-    const { data: invoice, error: invoiceError } = await supabase
+    const { data: invoice, error: invoiceError } = await adminDb
       .from("invoices")
       .select(`
         *,
@@ -65,10 +54,10 @@ export async function POST(
       )
     }
 
-    // Upload path in bucket: invoices/{business_id}/{invoice_id}.pdf
-    const fileName = `invoices/${business.id}/${invoice.id}.pdf`
+    const docType = invoice.status === "paid" ? "receipts" : "invoices"
+    const fileName = `${docType}/${business.id}/${invoice.id}.pdf`
 
-    const { error: uploadError } = await supabase.storage
+    const { error: uploadError } = await adminDb.storage
       .from("invoices")
       .upload(fileName, pdfBuffer, {
         contentType: "application/pdf",
@@ -76,25 +65,27 @@ export async function POST(
       })
 
     if (uploadError) {
-      // Friendly message helping guide storage bucket creation
-      throw new Error(
-        `Failed to upload PDF to storage. Please ensure a public storage bucket named "invoices" is created in Supabase. Detailed error: ${uploadError.message}`
-      )
+      console.error("Storage upload failed:", uploadError)
+      throw new Error(`Failed to upload generated PDF: ${uploadError.message}`)
     }
 
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = adminDb.storage
       .from("invoices")
       .getPublicUrl(fileName)
 
-    // Update pdf_url in invoices table
-    await supabase
+    const updateField = invoice.status === "paid" ? { receipt_url: publicUrl } : { pdf_url: publicUrl }
+    await adminDb
       .from("invoices")
-      .update({ pdf_url: publicUrl })
-      .eq("id", invoice.id)
+      .update(updateField)
+      .eq("id", id)
 
-    return NextResponse.json({ url: publicUrl })
+    return NextResponse.json({
+      success: true,
+      url: publicUrl,
+      type: docType,
+    })
   } catch (err: any) {
+    console.error("POST /api/invoices/[id]/pdf error:", err)
     return NextResponse.json({ error: err.message || "Failed to generate PDF" }, { status: 500 })
   }
 }

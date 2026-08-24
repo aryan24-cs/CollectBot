@@ -1,193 +1,168 @@
-import { createServerClient } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
-import { getSupabaseServiceRoleClient } from '@/lib/supabase/serviceRole'
+import { createServerClient } from "@supabase/ssr"
+import { NextResponse, type NextRequest } from "next/server"
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { getUserWorkspaces, determineRoleDashboard } from "@/lib/auth/workspaces"
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
-  
+
   // ─────────────────────────────────────────
-  // PUBLIC ROUTES (no auth needed)
+  // 1. PUBLIC ROUTES (No Auth Required)
   // ─────────────────────────────────────────
-  const publicRoutes = ['/', '/pricing', '/about', '/contact', '/privacy', '/refund', '/terms']
-  const publicPrefixes = ['/pay/', '/api/webhooks/', '/api/health', '/api/auth/']
-  
-  const isPublic = 
+  const publicRoutes = ["/", "/pricing", "/about", "/contact", "/privacy", "/refund", "/terms"]
+  const publicPrefixes = ["/pay/", "/api/webhooks/", "/api/health/", "/api/auth/callback", "/api/auth/route-user"]
+
+  const isPublic =
     publicRoutes.includes(path) ||
-    publicPrefixes.some(prefix => path.startsWith(prefix))
-  
+    publicPrefixes.some((prefix) => path.startsWith(prefix))
+
   if (isPublic) {
     return NextResponse.next()
   }
-  
+
   // ─────────────────────────────────────────
-  // AUTH ROUTES (login, signup)
+  // 2. AUTH ROUTES
   // ─────────────────────────────────────────
-  const authRoutes = ['/login', '/signup', '/forgot-password']
+  const authRoutes = ["/login", "/signup", "/forgot-password"]
   const isAuthRoute = authRoutes.includes(path)
-  
-  // Create Supabase client in proxy context for auth token parsing
+  const isSelectWorkspaceRoute = path === "/select-workspace"
+
   const response = NextResponse.next()
 
   try {
     const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "").trim().replace(/^["']|["']$/g, "") || "https://faoetyzqzqqtwatflefk.supabase.co"
     const rawKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "").trim().replace(/^["']|["']$/g, "") || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhb2V0eXpxenFxdHdhdGZsZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjUxMTYsImV4cCI6MjA5OTE0MTExNn0.iXGvbxN7wz0UgkkBU48uPxRmskJ6QpKBjsH_7YcUA18"
 
-    const supabase = createServerClient(
-      rawUrl,
-      rawKey,
-      {
-        cookies: {
-          getAll() {
-            return request.cookies.getAll()
-          },
-          setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-            cookiesToSet.forEach(({ name, value, options }) =>
-              response.cookies.set(name, value, options)
-            )
-          },
+    const supabase = createServerClient(rawUrl, rawKey, {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll()
         },
-      }
-    )
-    
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    // Not logged in
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
+        },
+      },
+    })
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    // Unauthenticated State
     if (!user) {
       if (isAuthRoute) return response
-      if (path.startsWith('/api/')) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      if (isSelectWorkspaceRoute) return NextResponse.redirect(new URL("/login", request.url))
+      if (path.startsWith("/api/")) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
-      return NextResponse.redirect(new URL('/login', request.url))
+      return NextResponse.redirect(new URL("/login", request.url))
     }
-    
+
     // ─────────────────────────────────────────
-    // USER IS LOGGED IN — CHECK ROLE (Service Role to bypass RLS)
+    // 3. SUPER ADMIN CHECK
     // ─────────────────────────────────────────
     const adminDb = getSupabaseServiceRoleClient()
-    
-    // Check if user is admin in admin_users
     const { data: adminUser } = await adminDb
-      .from('admin_users')
-      .select('id, role, is_active')
-      .eq('user_id', user.id)
-      .eq('is_active', true)
+      .from("admin_users")
+      .select("id, role, is_active")
+      .eq("user_id", user.id)
+      .eq("is_active", true)
       .maybeSingle()
-    
-    const isAdmin = !!adminUser || user.email === 'aryan.nda.2163@gmail.com'
-    
+
+    const isSuperAdmin = !!adminUser || user.email === "aryan.nda.2163@gmail.com"
+
+    if (isSuperAdmin && path.startsWith("/admin")) {
+      return response
+    }
+
     // ─────────────────────────────────────────
-    // CRITICAL ROUTING LOGIC FOR ADMINS
+    // 4. RESOLVE USER WORKSPACES
     // ─────────────────────────────────────────
-    if (isAdmin) {
-      const userRoutes = [
-        '/dashboard',
-        '/invoices',
-        '/clients',
-        '/reminders',
-        '/settings',
-        '/onboarding',
-      ]
-      
-      const isUserRoute = userRoutes.some(route => 
-        path.startsWith(route)
-      )
-      
-      if (isUserRoute || isAuthRoute) {
-        return NextResponse.redirect(
-          new URL('/admin/overview', request.url)
-        )
+    const workspaces = await getUserWorkspaces(user.id, user.email || undefined)
+
+    // User has 0 workspaces -> Force Onboarding
+    if (workspaces.length === 0) {
+      if (isSuperAdmin) {
+        return NextResponse.redirect(new URL("/admin/overview", request.url))
       }
-      
-      if (path.startsWith('/admin') || path.startsWith('/api')) {
+      if (path === "/onboarding" || path.startsWith("/api/onboarding") || path.startsWith("/api/settings")) {
         return response
       }
-      
-      return NextResponse.redirect(
-        new URL('/admin/overview', request.url)
-      )
-    }
-    
-    // ─────────────────────────────────────────
-    // NON-ADMIN USER (BUSINESS OWNER OR EMPLOYEE)
-    // ─────────────────────────────────────────
-    
-    if (path.startsWith('/admin')) {
-      return NextResponse.redirect(new URL('/dashboard', request.url))
+      return NextResponse.redirect(new URL("/onboarding", request.url))
     }
 
-    // 1. Check if owner
-    const { data: business } = await adminDb
-      .from('businesses')
-      .select('id, name')
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    // 2. Check if employee (Double lookup by user_id OR email)
-    const { data: employee } = await adminDb
-      .from('employees')
-      .select('id, business_id, employee_type, designation, status, user_id, email')
-      .or(`user_id.eq.${user.id},email.eq.${user.email}`)
-      .maybeSingle()
-
-    let userRole = 'UNKNOWN'
-    let targetDashboard = '/onboarding'
-
-    if (business) {
-      userRole = 'OWNER'
-      targetDashboard = '/dashboard'
-    } else if (employee) {
-      userRole = employee.employee_type || 'FINANCE'
-      if (userRole === 'SALES') targetDashboard = '/dashboard/sales'
-      else if (userRole === 'MARKETING') targetDashboard = '/dashboard/marketing'
-      else targetDashboard = '/dashboard/finance'
-    }
-
-    // 3. Un-onboarded Owner (No business and not an employee)
-    if (userRole === 'UNKNOWN') {
-      if (path === '/onboarding' || path.startsWith('/api/onboarding') || path.startsWith('/api/settings')) {
-        return response
-      }
-      return NextResponse.redirect(new URL('/onboarding', request.url))
-    }
-
-    // 4. Employee Zero-Onboarding Enforcement
-    if (userRole !== 'OWNER' && path === '/onboarding') {
-      return NextResponse.redirect(new URL(targetDashboard, request.url))
-    }
-
-    // 5. Auth Route Bypass for Logged-In Users
+    // Authenticated user hitting Auth Routes (login/signup)
     if (isAuthRoute) {
+      if (isSuperAdmin) {
+        return NextResponse.redirect(new URL("/admin/overview", request.url))
+      }
+      if (workspaces.length === 1) {
+        const dest = determineRoleDashboard(workspaces[0].role)
+        return NextResponse.redirect(new URL(dest, request.url))
+      }
+      return NextResponse.redirect(new URL("/select-workspace", request.url))
+    }
+
+    // If user is accessing /select-workspace, allow it
+    if (isSelectWorkspaceRoute) {
+      return response
+    }
+
+    // ─────────────────────────────────────────
+    // 5. ACTIVE WORKSPACE DETERMINATION & ROUTE ACCESS
+    // ─────────────────────────────────────────
+    const activeBusinessIdCookie = request.cookies.get("cb_active_business_id")?.value
+    let activeWorkspace = workspaces.find((w) => w.businessId === activeBusinessIdCookie)
+
+    if (!activeWorkspace) {
+      // Default to first owned business, or first available membership
+      activeWorkspace = workspaces.find((w) => w.isOwner) || workspaces[0]
+      response.cookies.set("cb_active_business_id", activeWorkspace.businessId, {
+        path: "/",
+        httpOnly: false,
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+      })
+    }
+
+    const userRole = activeWorkspace.role
+    const targetDashboard = determineRoleDashboard(userRole)
+
+    // Prevent non-owners from entering onboarding
+    if (!activeWorkspace.isOwner && path === "/onboarding") {
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
 
-    // 6. Department Scope Security Enforcement
-    const financePaths = ['/invoices', '/expenses', '/approvals', '/reminders', '/api/invoices', '/api/payments', '/api/expenses', '/api/approvals']
-    const salesPaths = ['/dashboard/sales', '/api/sales']
-    const marketingPaths = ['/dashboard/marketing', '/api/marketing']
+    // ─────────────────────────────────────────
+    // 6. DEPARTMENT SCOPE SECURITY ENFORCEMENT
+    // ─────────────────────────────────────────
+    const financePaths = ["/invoices", "/expenses", "/approvals", "/reminders", "/settings/gateways", "/settings/exports"]
+    const salesPaths = ["/dashboard/sales"]
+    const marketingPaths = ["/dashboard/marketing"]
 
-    const isFinancePath = financePaths.some(p => path.startsWith(p))
-    const isSalesPath = salesPaths.some(p => path.startsWith(p))
-    const isMarketingPath = marketingPaths.some(p => path.startsWith(p))
+    const isFinancePath = financePaths.some((p) => path.startsWith(p))
+    const isSalesPath = salesPaths.some((p) => path.startsWith(p))
+    const isMarketingPath = marketingPaths.some((p) => path.startsWith(p))
 
-    if (isFinancePath && userRole !== 'OWNER' && userRole !== 'FINANCE') {
+    if (isFinancePath && userRole !== "OWNER" && userRole !== "FINANCE") {
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
-    if (isSalesPath && userRole !== 'OWNER' && userRole !== 'SALES') {
+    if (isSalesPath && userRole !== "OWNER" && userRole !== "SALES") {
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
-    if (isMarketingPath && userRole !== 'OWNER' && userRole !== 'MARKETING') {
+    if (isMarketingPath && userRole !== "OWNER" && userRole !== "MARKETING") {
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
 
     return response
   } catch (err) {
     console.error("Proxy middleware error:", err)
-    if (isAuthRoute) {
-      return response
-    }
-    if (path.startsWith('/api/')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (isAuthRoute) return response
+    if (path.startsWith("/api/")) {
+      return NextResponse.json({ error: "Internal middleware error" }, { status: 500 })
     }
     return response
   }
@@ -198,6 +173,6 @@ export const middleware = proxy
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 }
