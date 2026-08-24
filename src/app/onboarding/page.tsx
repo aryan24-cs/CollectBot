@@ -147,7 +147,8 @@ export default function OnboardingPage() {
         // Check if user is an employee — employees NEVER go through business onboarding!
         try {
           const profileRes = await fetch("/api/settings/business")
-          if (profileRes.ok) {
+          const contentType = profileRes.headers.get("content-type") || ""
+          if (profileRes.ok && contentType.includes("application/json")) {
             const profileData = await profileRes.json()
             if (profileData.isOwner === false) {
               const empType = profileData.employee?.employee_type

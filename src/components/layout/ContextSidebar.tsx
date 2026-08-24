@@ -95,7 +95,8 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     async function loadWorkspaces() {
       try {
         const res = await fetch("/api/auth/workspaces")
-        if (res.ok) {
+        const contentType = res.headers.get("content-type") || ""
+        if (res.ok && contentType.includes("application/json")) {
           const data = await res.json()
           if (data.workspaces) {
             setAllWorkspaces(data.workspaces)
@@ -111,7 +112,8 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
     async function loadPermissions() {
       try {
         const res = await fetch("/api/settings/business")
-        if (res.ok) {
+        const contentType = res.headers.get("content-type") || ""
+        if (res.ok && contentType.includes("application/json")) {
           const data = await res.json()
           setIsOwner(data.isOwner !== false)
           setPermissions(data.permissions || ["all"])
@@ -133,7 +135,10 @@ export default function ContextSidebar({ business }: ContextSidebarProps) {
           fetch("/api/clients?limit=1000"),
         ])
 
-        if (invRes.ok && clientRes.ok) {
+        const invType = invRes.headers.get("content-type") || ""
+        const clientType = clientRes.headers.get("content-type") || ""
+
+        if (invRes.ok && invType.includes("application/json") && clientRes.ok && clientType.includes("application/json")) {
           const invData = await invRes.json()
           const clientData = await clientRes.json()
 

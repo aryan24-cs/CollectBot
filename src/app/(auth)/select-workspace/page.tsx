@@ -49,7 +49,8 @@ export default function SelectWorkspacePage() {
     try {
       setLoading(true)
       const res = await fetch("/api/auth/workspaces")
-      if (!res.ok) {
+      const contentType = res.headers.get("content-type") || ""
+      if (!res.ok || !contentType.includes("application/json")) {
         if (res.status === 401) {
           router.push("/login")
           return

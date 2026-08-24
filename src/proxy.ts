@@ -5,6 +5,7 @@ import { getUserWorkspaces, determineRoleDashboard } from "@/lib/auth/workspaces
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname
+  const isApiRoute = path.startsWith("/api/")
 
   // ─────────────────────────────────────────
   // 1. PUBLIC ROUTES (No Auth Required)
@@ -54,8 +55,7 @@ export async function proxy(request: NextRequest) {
     // Unauthenticated State
     if (!user) {
       if (isAuthRoute) return response
-      if (isSelectWorkspaceRoute) return NextResponse.redirect(new URL("/login", request.url))
-      if (path.startsWith("/api/")) {
+      if (isApiRoute) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
       }
       return NextResponse.redirect(new URL("/login", request.url))
@@ -74,7 +74,7 @@ export async function proxy(request: NextRequest) {
 
     const isSuperAdmin = !!adminUser || user.email === "aryan.nda.2163@gmail.com"
 
-    if (isSuperAdmin && path.startsWith("/admin")) {
+    if (isSuperAdmin && (path.startsWith("/admin") || isApiRoute)) {
       return response
     }
 
@@ -83,12 +83,15 @@ export async function proxy(request: NextRequest) {
     // ─────────────────────────────────────────
     const workspaces = await getUserWorkspaces(user.id, user.email || undefined)
 
-    // User has 0 workspaces -> Force Onboarding
+    // User has 0 workspaces -> Force Onboarding for pages, let APIs pass through
     if (workspaces.length === 0) {
       if (isSuperAdmin) {
         return NextResponse.redirect(new URL("/admin/overview", request.url))
       }
-      if (path === "/onboarding" || path.startsWith("/api/onboarding") || path.startsWith("/api/settings")) {
+      if (isApiRoute) {
+        return response
+      }
+      if (path === "/onboarding") {
         return response
       }
       return NextResponse.redirect(new URL("/onboarding", request.url))
@@ -131,7 +134,7 @@ export async function proxy(request: NextRequest) {
     const userRole = activeWorkspace.role
     const targetDashboard = determineRoleDashboard(userRole)
 
-    // Prevent non-owners from entering onboarding
+    // Prevent non-owners from entering onboarding page
     if (!activeWorkspace.isOwner && path === "/onboarding") {
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
@@ -148,12 +151,21 @@ export async function proxy(request: NextRequest) {
     const isMarketingPath = marketingPaths.some((p) => path.startsWith(p))
 
     if (isFinancePath && userRole !== "OWNER" && userRole !== "FINANCE") {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Forbidden: Finance role required" }, { status: 403 })
+      }
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
     if (isSalesPath && userRole !== "OWNER" && userRole !== "SALES") {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Forbidden: Sales role required" }, { status: 403 })
+      }
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
     if (isMarketingPath && userRole !== "OWNER" && userRole !== "MARKETING") {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Forbidden: Marketing role required" }, { status: 403 })
+      }
       return NextResponse.redirect(new URL(targetDashboard, request.url))
     }
 
@@ -161,7 +173,7 @@ export async function proxy(request: NextRequest) {
   } catch (err) {
     console.error("Proxy middleware error:", err)
     if (isAuthRoute) return response
-    if (path.startsWith("/api/")) {
+    if (isApiRoute) {
       return NextResponse.json({ error: "Internal middleware error" }, { status: 500 })
     }
     return response
