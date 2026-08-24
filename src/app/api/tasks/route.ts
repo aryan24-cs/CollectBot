@@ -11,44 +11,30 @@ export async function GET(request: NextRequest) {
 
     let query = supabase
       .from("tasks")
-      .select("*, assignee:employees!assignee_id(id, name)")
+      .select("*")
       .eq("business_id", business.id)
 
-    // For employees, isolate personal work (tasks assigned to or created by them)
+    // For employees, show tasks assigned to them or unassigned
     if (employee) {
-      query = query.or(`assignee_id.eq.${employee.id},creator_id.eq.${employee.id}`)
+      query = query.or(`assignee_id.eq.${employee.id},assignee_id.is.null`)
     }
 
-    let { data: tasks, error: queryError } = await query.order("created_at", { ascending: false })
+    const { data: rawTasks, error: rawError } = await query.order("created_at", { ascending: false })
 
-    // Fetch active workspace employees for assignee selector
+    if (rawError) throw rawError
+
+    // Fetch active workspace employees for assignee mapping
     const { data: employees } = await supabase
       .from("employees")
       .select("id, name")
       .eq("business_id", business.id)
       .eq("status", "active")
 
-    if (queryError) {
-      console.warn("Tasks FK join query failed, falling back to manual join:", queryError.message)
-      let fallbackQuery = supabase
-        .from("tasks")
-        .select("*")
-        .eq("business_id", business.id)
-
-      if (employee) {
-        fallbackQuery = fallbackQuery.or(`assignee_id.eq.${employee.id},creator_id.eq.${employee.id}`)
-      }
-
-      const { data: rawTasks, error: rawError } = await fallbackQuery.order("created_at", { ascending: false })
-
-      if (rawError) throw rawError
-
-      const empMap = new Map((employees || []).map((e) => [e.id, e]))
-      tasks = (rawTasks || []).map((t) => ({
-        ...t,
-        assignee: t.assignee_id ? empMap.get(t.assignee_id) || null : null,
-      }))
-    }
+    const empMap = new Map((employees || []).map((e) => [e.id, e]))
+    const tasks = (rawTasks || []).map((t) => ({
+      ...t,
+      assignee: t.assignee_id ? empMap.get(t.assignee_id) || null : null,
+    }))
 
     return NextResponse.json({ tasks: tasks || [], employees: employees || [] })
   } catch (err: any) {
@@ -75,7 +61,6 @@ export async function POST(request: NextRequest) {
       .from("tasks")
       .insert({
         business_id: business.id,
-        creator_id: employee?.id || null,
         assignee_id: assignee_id || employee?.id || null,
         title,
         description: description || null,
@@ -97,6 +82,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, task }, { status: 201 })
   } catch (err: any) {
+    console.error("POST /api/tasks error:", err)
     return NextResponse.json({ error: err.message || "Failed to create task" }, { status: 500 })
   }
 }
