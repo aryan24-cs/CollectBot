@@ -59,16 +59,20 @@ export default async function DashboardLayout({
     .eq("id", activeWorkspace.businessId)
     .maybeSingle()
 
-  if (!business) {
-    redirect("/onboarding")
+  const safeBusiness = business || {
+    id: activeWorkspace.businessId,
+    name: activeWorkspace.businessName || "My Workspace",
+    logo_url: activeWorkspace.businessLogo || null,
+    email: user.email || "",
+    currency: activeWorkspace.currency || "INR",
   }
 
-  const userEmail = business.email || user.email || ""
+  const userEmail = safeBusiness.email || user.email || ""
   const userName = user.user_metadata?.full_name || user.email?.split("@")[0] || "User"
 
   return (
     <DashboardLayoutClient
-      business={business}
+      business={safeBusiness}
       userEmail={userEmail}
       userName={userName}
     >

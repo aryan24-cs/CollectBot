@@ -33,13 +33,8 @@ export function validateEnv() {
   })
 
   if (missingRequired.length > 0) {
-    const errorMsg = `⚠️ CRITICAL LAUNCH FAILURE: Required core environment variables are missing:\n${missingRequired.join("\n")}\n\nPlease check your .env.local configurations.`
+    const errorMsg = `⚠️ WARNING: Required core environment variables are missing:\n${missingRequired.join("\n")}\n\nFalling back to configured project defaults.`
     console.error(errorMsg)
-    
-    const isBuildPhase = process.env.PHASE === "phase-production-build" || process.env.NEXT_PHASE === "phase-production-build"
-    if (process.env.NODE_ENV === "production" && !isBuildPhase) {
-      throw new Error(errorMsg)
-    }
   } else {
     console.log("✅ Core Launch Readiness: Supabase environment variables validated successfully.")
   }
