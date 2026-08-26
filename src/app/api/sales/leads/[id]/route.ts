@@ -27,7 +27,6 @@ export async function PUT(
       .select("id, status")
       .eq("id", id)
       .eq("business_id", business.id)
-      .is("deleted_at", null)
       .maybeSingle()
 
     if (!existingLead) {
@@ -115,20 +114,16 @@ export async function DELETE(
       .select("id, name")
       .eq("id", id)
       .eq("business_id", business.id)
-      .is("deleted_at", null)
       .maybeSingle()
 
     if (!lead) {
       return NextResponse.json({ error: "CRM lead not found." }, { status: 404 })
     }
 
-    // Soft delete lead
+    // Delete lead
     const { error: deleteError } = await adminDb
       .from("sales_leads")
-      .update({ 
-        deleted_at: new Date().toISOString(),
-        updated_by: user.id
-      })
+      .delete()
       .eq("id", id)
 
     if (deleteError) throw deleteError

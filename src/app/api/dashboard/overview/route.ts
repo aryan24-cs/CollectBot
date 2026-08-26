@@ -41,7 +41,6 @@ export async function GET(request: NextRequest) {
         .from("sales_leads")
         .select("*")
         .eq("business_id", bizId)
-        .is("deleted_at", null)
         .order("created_at", { ascending: false }),
       adminDb
         .from("marketing_campaigns")
@@ -51,14 +50,12 @@ export async function GET(request: NextRequest) {
       adminDb
         .from("marketing_coupons")
         .select("id")
-        .eq("business_id", bizId)
-        .is("deleted_at", null),
+        .eq("business_id", bizId),
       adminDb
         .from("employees")
         .select("id, name, email, employee_type, designation, status")
         .eq("business_id", bizId)
-        .eq("status", "active")
-        .is("deleted_at", null),
+        .eq("status", "active"),
     ])
 
     const invoices = invoicesRes.data || []

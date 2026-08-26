@@ -21,7 +21,6 @@ export async function GET(request: NextRequest) {
       .from("sales_leads")
       .select("*, employee:employees!assigned_to(id, name)")
       .eq("business_id", business.id)
-      .is("deleted_at", null)
 
     if (stage) {
       query = query.eq("status", stage)
@@ -39,7 +38,6 @@ export async function GET(request: NextRequest) {
         .from("sales_leads")
         .select("*")
         .eq("business_id", business.id)
-        .is("deleted_at", null)
 
       if (stage) fallbackQuery = fallbackQuery.eq("status", stage)
       if (search) fallbackQuery = fallbackQuery.or(`name.ilike.%${search}%,company.ilike.%${search}%,email.ilike.%${search}%`)

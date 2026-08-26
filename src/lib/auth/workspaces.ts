@@ -76,7 +76,6 @@ export async function getUserWorkspaces(userId: string, email?: string): Promise
       business:businesses(id, name, logo_url, city, currency, created_at)
     `)
     .eq("status", "active")
-    .is("deleted_at", null)
 
   if (userId && email) {
     employeeQuery = employeeQuery.or(`user_id.eq.${userId},email.ilike.${email.trim()}`)

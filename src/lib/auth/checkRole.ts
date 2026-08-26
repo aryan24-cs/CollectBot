@@ -88,7 +88,6 @@ export async function requireBusinessUser(request?: Request) {
       .select("*, department:departments(*), custom_role:custom_roles(*)")
       .eq("business_id", business.id)
       .eq("status", "active")
-      .is("deleted_at", null)
 
     if (user.id && user.email) {
       empQuery = empQuery.or(`user_id.eq.${user.id},email.ilike.${user.email.trim()}`)

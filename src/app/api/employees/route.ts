@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
       .from("employees")
       .select("*, department:departments(id, name), custom_role:custom_roles(id, name), branch:branches(id, name)")
       .eq("business_id", business.id)
-      .is("deleted_at", null)
       .order("created_at", { ascending: false })
 
     if (empError) throw empError
@@ -80,7 +79,6 @@ export async function POST(request: NextRequest) {
       .select("id, status")
       .eq("business_id", business.id)
       .ilike("email", normalizedEmail)
-      .is("deleted_at", null)
       .maybeSingle()
 
     if (existingInThisBiz) {
