@@ -47,7 +47,7 @@ export async function processAllReminders(): Promise<ProcessingResult> {
     .select(`
       *,
       client:clients(*),
-      business:businesses(*, notification_settings(*))
+      business:businesses(*, reminder_settings(*))
     `)
     .in("status", ["sent", "viewed", "overdue", "partial"])
     .eq("reminder_paused", false)
@@ -71,8 +71,8 @@ export async function processAllReminders(): Promise<ProcessingResult> {
   for (const invoice of invoices) {
     processedCount++
 
-    // Fetch nested notification settings
-    const rawSettings = invoice.business?.notification_settings
+    // Fetch nested reminder settings
+    const rawSettings = invoice.business?.reminder_settings
     const settings = Array.isArray(rawSettings) ? rawSettings[0] : rawSettings
 
     // 3. Quiet Hours check: respect business-level rules or default to 9 AM - 8 PM IST
@@ -128,7 +128,7 @@ export async function processAllReminders(): Promise<ProcessingResult> {
       .from("reminder_logs")
       .select("id")
       .eq("invoice_id", invoice.id)
-      .eq("reminder_type", reminderType)
+      .eq("message_type", reminderType)
       .eq("status", "sent")
       .gte("sent_at", `${todayISTString}T00:00:00.000Z`)
       .lte("sent_at", `${todayISTString}T23:59:59.999Z`)
@@ -213,7 +213,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
           await supabase.from("reminder_logs").insert({
             invoice_id: invoice.id,
             business_id: invoice.business.id,
-            reminder_type: reminderType,
+            client_id: invoice.client.id || null,
+            message_type: reminderType,
+            phone_or_email: invoice.client.phone || "",
             channel: "whatsapp",
             status: "sent",
             message_content: `WhatsApp sent to +91${invoice.client.phone.slice(-10)}`,
@@ -222,7 +224,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
           await supabase.from("reminder_logs").insert({
             invoice_id: invoice.id,
             business_id: invoice.business.id,
-            reminder_type: reminderType,
+            client_id: invoice.client.id || null,
+            message_type: reminderType,
+            phone_or_email: invoice.client.phone || "",
             channel: "whatsapp",
             status: "failed",
             error_message: waResult?.error || "Interakt API failed",
@@ -233,7 +237,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
         await supabase.from("reminder_logs").insert({
           invoice_id: invoice.id,
           business_id: invoice.business.id,
-          reminder_type: reminderType,
+          client_id: invoice.client.id || null,
+          message_type: reminderType,
+          phone_or_email: invoice.client.phone || "",
           channel: "whatsapp",
           status: "failed",
           error_message: waErr.message || "WhatsApp send crashed",
@@ -273,7 +279,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
         await supabase.from("reminder_logs").insert({
           invoice_id: invoice.id,
           business_id: invoice.business.id,
-          reminder_type: reminderType,
+          client_id: invoice.client.id || null,
+          message_type: reminderType,
+          phone_or_email: invoice.client.email,
           channel: "email",
           status: "sent",
           message_content: `Email sent to ${invoice.client.email}`,
@@ -283,7 +291,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
         await supabase.from("reminder_logs").insert({
           invoice_id: invoice.id,
           business_id: invoice.business.id,
-          reminder_type: reminderType,
+          client_id: invoice.client.id || null,
+          message_type: reminderType,
+          phone_or_email: invoice.client.email,
           channel: "email",
           status: "failed",
           error_message: mailErr.message || "Resend dispatch crashed",

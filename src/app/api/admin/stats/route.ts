@@ -45,7 +45,6 @@ export async function GET() {
     const totalPayments = paymentsRes.count || 0
 
     const totalPaymentVolume = payments
-      .filter((p: any) => p.status === "captured" || p.status === "paid")
       .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
 
     // Today's stats
@@ -67,12 +66,12 @@ export async function GET() {
       (b: any) => new Date(b.created_at) >= weekAgo
     ).length
 
-    // Plan distribution
+    // Plan distribution (aligned with schema plans: free, starter, pro, enterprise)
     const planDistribution = {
       free: subscriptions.filter((s: any) => s.plan_name === "free" || !s.plan_name).length,
-      solo: subscriptions.filter((s: any) => s.plan_name === "solo").length,
-      business: subscriptions.filter((s: any) => s.plan_name === "business").length,
-      scale: subscriptions.filter((s: any) => s.plan_name === "scale").length,
+      starter: subscriptions.filter((s: any) => s.plan_name === "starter" || s.plan_name === "solo").length,
+      pro: subscriptions.filter((s: any) => s.plan_name === "pro" || s.plan_name === "business").length,
+      enterprise: subscriptions.filter((s: any) => s.plan_name === "enterprise" || s.plan_name === "scale").length,
     }
 
     // Active subscriptions

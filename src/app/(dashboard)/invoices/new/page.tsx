@@ -97,25 +97,23 @@ export default function NewInvoicePage() {
           return
         }
 
-        // Fetch Business profile
-        const { data: biz } = await supabase
-          .from("businesses")
-          .select("*")
-          .eq("user_id", user.id)
-          .maybeSingle()
-
-        if (biz) {
-          setBusiness(biz)
+        // 1. Fetch Business Profile (Supports both Owners and Employees)
+        const bizRes = await fetch("/api/settings/business")
+        if (!bizRes.ok) {
+          router.push("/onboarding")
+          return
         }
+        const bizData = await bizRes.json()
+        setBusiness(bizData)
 
-        // Fetch Clients List
-        const { data: clientList } = await supabase
-          .from("clients")
-          .select("*")
-          .eq("business_id", biz?.id)
-          .order("name", { ascending: true })
-
-        setClients(clientList || [])
+        // 2. Fetch Clients List for this active business
+        let fetchedClients: Client[] = []
+        const clientRes = await fetch("/api/clients?limit=1000")
+        if (clientRes.ok) {
+          const clientData = await clientRes.json()
+          fetchedClients = clientData.clients || []
+          setClients(fetchedClients)
+        }
 
         // If Editing mode: load existing invoice details
         if (editId) {
@@ -146,24 +144,24 @@ export default function NewInvoicePage() {
               })),
             })
             
-            if (clientList) {
-              const matched = clientList.find(c => c.id === invoiceData.client_id)
+            if (fetchedClients.length > 0) {
+              const matched = fetchedClients.find((c: Client) => c.id === invoiceData.client_id)
               if (matched) setSelectedClient(matched)
             }
           }
         } else {
           // If creation mode: auto-fill invoice serial number
-          if (biz) {
-            const prefix = biz.invoice_prefix || "INV"
-            const counter = biz.invoice_counter || 1
+          if (bizData) {
+            const prefix = bizData.invoice_prefix || "INV"
+            const counter = bizData.invoice_counter || 1
             const year = new Date().getFullYear()
             const generatedNumber = `${prefix}-${year}-${String(counter).padStart(3, "0")}`
             form.setValue("invoice_number", generatedNumber)
           }
 
           // Preselect client from query params
-          if (preselectedClientId && clientList) {
-            const matched = clientList.find(c => c.id === preselectedClientId)
+          if (preselectedClientId && fetchedClients.length > 0) {
+            const matched = fetchedClients.find((c: Client) => c.id === preselectedClientId)
             if (matched) {
               form.setValue("client_id", preselectedClientId)
               setSelectedClient(matched)

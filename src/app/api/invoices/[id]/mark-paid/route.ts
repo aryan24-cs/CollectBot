@@ -44,15 +44,19 @@ export async function POST(
     const methodDetails = payment_method ? ` (${payment_method})` : ""
     const paymentNotes = notes ? `${notes}${methodDetails}` : `Manual payment cleared${methodDetails}`
 
+    const rawMode = (payment_method || "other").toLowerCase()
+    const validModes = ["upi", "bank_transfer", "cash", "cheque", "card", "razorpay", "other"]
+    const paymentMode = validModes.includes(rawMode) ? rawMode : "other"
+
     const { data: paymentRecord, error: paymentError } = await adminDb
       .from("payments")
       .insert({
         invoice_id: id,
         business_id: business.id,
+        client_id: invoice.client_id || null,
         amount: parsedAmount,
-        payment_method: "manual",
-        status: "success",
-        paid_at: paidAt,
+        payment_mode: paymentMode,
+        payment_date: paidAt.split("T")[0],
         notes: paymentNotes,
       })
       .select()
