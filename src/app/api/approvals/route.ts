@@ -11,31 +11,22 @@ export async function GET(request: NextRequest) {
 
     let { data: requests, error: queryError } = await supabase
       .from("approval_requests")
-      .select("*, requester:employees!requester_id(id, name), approval_steps(*)")
+      .select("*")
       .eq("business_id", business.id)
       .order("created_at", { ascending: false })
 
-    if (queryError) {
-      console.warn("Approvals FK join query failed, falling back to manual join:", queryError.message)
-      const { data: rawRequests, error: rawError } = await supabase
-        .from("approval_requests")
-        .select("*, approval_steps(*)")
-        .eq("business_id", business.id)
-        .order("created_at", { ascending: false })
+    if (queryError) throw queryError
 
-      if (rawError) throw rawError
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name")
+      .eq("business_id", business.id)
 
-      const { data: employees } = await supabase
-        .from("employees")
-        .select("id, name")
-        .eq("business_id", business.id)
-
-      const empMap = new Map((employees || []).map((e) => [e.id, e]))
-      requests = (rawRequests || []).map((req) => ({
-        ...req,
-        requester: req.requester_id ? empMap.get(req.requester_id) || null : null,
-      }))
-    }
+    const empMap = new Map((employees || []).map((e) => [e.id, e]))
+    requests = (requests || []).map((req) => ({
+      ...req,
+      requester: req.requester_id ? empMap.get(req.requester_id) || null : null,
+    }))
 
     // Enrich with target object details
     const enriched = await Promise.all(
@@ -77,7 +68,7 @@ export async function POST(request: NextRequest) {
     // 1. Fetch approval request
     const { data: appReq, error: fetchErr } = await adminDb
       .from("approval_requests")
-      .select("*, approval_steps(*)")
+      .select("*")
       .eq("id", approval_request_id)
       .eq("business_id", business.id)
       .maybeSingle()
@@ -91,20 +82,6 @@ export async function POST(request: NextRequest) {
     }
 
     const statusValue = action === "approve" ? "approved" : "rejected"
-
-    // 2. Update step details
-    const activeStep = appReq.approval_steps?.find((s: any) => s.status === "pending")
-    if (activeStep) {
-      await adminDb
-        .from("approval_steps")
-        .update({
-          status: statusValue,
-          comment: comment || null,
-          approver_id: employee?.id || null,
-          decided_at: new Date().toISOString(),
-        })
-        .eq("id", activeStep.id)
-    }
 
     // 3. Update overall request status
     await adminDb

@@ -57,6 +57,9 @@ export async function POST(request: NextRequest) {
 
     const adminDb = getSupabaseServiceRoleClient()
 
+    const validStatuses = ["todo", "in_progress", "completed"]
+    const taskStatus = validStatuses.includes(status) ? status : "todo"
+
     const { data: task, error: insertError } = await adminDb
       .from("tasks")
       .insert({
@@ -64,7 +67,7 @@ export async function POST(request: NextRequest) {
         assignee_id: assignee_id || employee?.id || null,
         title,
         description: description || null,
-        status: status || "todo",
+        status: taskStatus,
         due_date: due_date || null,
       })
       .select()

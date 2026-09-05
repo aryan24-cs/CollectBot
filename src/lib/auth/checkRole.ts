@@ -64,11 +64,13 @@ export async function requireBusinessUser(request?: Request) {
   const adminDb = getSupabaseServiceRoleClient()
 
   // Fetch complete business details
-  const { data: business, error: bizErr } = await adminDb
+  const { data: businessRaw, error: bizErr } = await (adminDb as any)
     .from("businesses")
     .select("*")
     .eq("id", selectedWorkspace.businessId)
     .single()
+
+  const business = businessRaw as any
 
   if (bizErr || !business) {
     return {

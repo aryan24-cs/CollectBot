@@ -29,7 +29,7 @@ interface ProcessingResult {
  * Sweeps the database for unpaid invoices and dispatches scheduled notifications.
  */
 export async function processAllReminders(): Promise<ProcessingResult> {
-  const supabase = getSupabaseServiceRoleClient()
+  const supabase: any = getSupabaseServiceRoleClient()
   let processedCount = 0
   let sentCount = 0
 
@@ -57,7 +57,8 @@ export async function processAllReminders(): Promise<ProcessingResult> {
     throw error
   }
 
-  if (!invoices || invoices.length === 0) {
+  const invoiceList: any[] = invoices || []
+  if (invoiceList.length === 0) {
     console.log("No invoices require reminder check today.")
     return { processedCount: 0, sentCount: 0 }
   }
@@ -66,9 +67,9 @@ export async function processAllReminders(): Promise<ProcessingResult> {
   const todayISTString = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date())
   const today = new Date(todayISTString)
 
-  console.log(`Processing reminders for ${invoices.length} invoices on date: ${todayISTString}`)
+  console.log(`Processing reminders for ${invoiceList.length} invoices on date: ${todayISTString}`)
 
-  for (const invoice of invoices) {
+  for (const invoice of invoiceList) {
     processedCount++
 
     // Fetch nested reminder settings

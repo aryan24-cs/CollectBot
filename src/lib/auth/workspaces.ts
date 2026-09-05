@@ -44,7 +44,7 @@ export async function getUserWorkspaces(userId: string, email?: string): Promise
       .eq("user_id", userId)
 
     if (!ownerErr && ownedBusinesses) {
-      for (const biz of ownedBusinesses) {
+      for (const biz of (ownedBusinesses as any[])) {
         workspacesMap.set(biz.id, {
           businessId: biz.id,
           businessName: biz.name || "My Business",
@@ -88,7 +88,7 @@ export async function getUserWorkspaces(userId: string, email?: string): Promise
   const { data: employeeMemberships, error: empErr } = await employeeQuery
 
   if (!empErr && employeeMemberships) {
-    for (const emp of employeeMemberships) {
+    for (const emp of (employeeMemberships as any[])) {
       const biz: any = emp.business
       if (!biz || !biz.id) continue
 
@@ -99,7 +99,7 @@ export async function getUserWorkspaces(userId: string, email?: string): Promise
 
       // Auto-link user_id on the employee record if missing
       if (userId && (!emp.user_id || emp.user_id !== userId)) {
-        await adminDb
+        await (adminDb as any)
           .from("employees")
           .update({ user_id: userId, status: "active" })
           .eq("id", emp.id)

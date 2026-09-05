@@ -73,10 +73,9 @@ export async function POST(
       .from("invoices")
       .getPublicUrl(fileName)
 
-    const updateField = invoice.status === "paid" ? { receipt_url: publicUrl } : { pdf_url: publicUrl }
     await adminDb
       .from("invoices")
-      .update(updateField)
+      .update({ pdf_url: publicUrl, updated_at: new Date().toISOString() })
       .eq("id", id)
 
     return NextResponse.json({

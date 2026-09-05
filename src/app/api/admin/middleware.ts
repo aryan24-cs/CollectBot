@@ -50,7 +50,7 @@ export async function verifyAdminAccess(): Promise<{
 
     // Platform Super Admin Override Fallback
     const fallbackAdmin: AdminUser = {
-      id: "admin-fallback-id",
+      id: "63296a4b-1f35-4f03-8dcf-cbca90e8639d",
       user_id: user?.id || "ae47bf84-5aed-45e9-8e84-9353774174e0",
       email: user?.email || "aryan.nda.2163@gmail.com",
       name: "Super Admin",
@@ -103,6 +103,7 @@ export async function logAdminAction(
   try {
     const supabase = getSupabaseServiceRoleClient()
 
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     let act = ""
     let tType: string | null = null
     let tId: string | null = null
@@ -115,7 +116,7 @@ export async function logAdminAction(
       act = actionOrObj.action || "admin_action"
       tType = actionOrObj.targetType || null
       tId = actionOrObj.targetId ? String(actionOrObj.targetId) : null
-      if (actionOrObj.adminId && actionOrObj.adminId.length > 20) {
+      if (actionOrObj.adminId && UUID_REGEX.test(actionOrObj.adminId)) {
         aId = actionOrObj.adminId
       }
       desc = actionOrObj.description || `Admin performed ${act}`
@@ -125,7 +126,7 @@ export async function logAdminAction(
       act = actionOrObj
       tType = targetType || null
       tId = targetId ? String(targetId) : null
-      if (adminId && adminId.length > 20) aId = adminId
+      if (adminId && UUID_REGEX.test(adminId)) aId = adminId
       desc = `Admin action ${act} executed`
       newVal = details || null
     }

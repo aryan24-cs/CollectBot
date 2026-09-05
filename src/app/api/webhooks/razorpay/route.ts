@@ -22,15 +22,19 @@ export async function POST(request: NextRequest) {
 
     const adminDb = getSupabaseServiceRoleClient()
 
-    // Log raw webhook event for audit trail
-    await adminDb.from("payment_webhooks").insert({
-      business_id: businessId || null,
-      gateway_provider: "razorpay",
-      event_type: eventType,
-      payload,
-      signature: signature || null,
-      status: "processed",
-    })
+    // Log raw webhook event for audit trail if table exists
+    try {
+      await adminDb.from("payment_webhooks").insert({
+        business_id: businessId || null,
+        gateway_provider: "razorpay",
+        event_type: eventType,
+        payload,
+        signature: signature || null,
+        status: "processed",
+      })
+    } catch (_) {
+      // Optional table fallback
+    }
 
     // Ignore non-payment events
     if (eventType !== "payment.captured" && eventType !== "payment_link.paid" && eventType !== "order.paid") {
@@ -48,16 +52,20 @@ export async function POST(request: NextRequest) {
     let webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || ""
 
     if (businessId) {
-      const { data: gateway } = await adminDb
-        .from("payment_gateways")
-        .select("webhook_secret")
-        .eq("business_id", businessId)
-        .eq("provider", "razorpay")
-        .eq("is_enabled", true)
-        .maybeSingle()
+      try {
+        const { data: gateway } = await adminDb
+          .from("payment_gateways")
+          .select("webhook_secret")
+          .eq("business_id", businessId)
+          .eq("provider", "razorpay")
+          .eq("is_enabled", true)
+          .maybeSingle()
 
-      if (gateway?.webhook_secret) {
-        webhookSecret = gateway.webhook_secret
+        if (gateway?.webhook_secret) {
+          webhookSecret = gateway.webhook_secret
+        }
+      } catch (_) {
+        // Optional table fallback
       }
     }
 
@@ -90,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { data: existingPayment } = await adminDb
       .from("payments")
       .select("id")
-      .eq("razorpay_payment_id", razorpayPaymentId)
+      .eq("razorpay_id", razorpayPaymentId)
       .maybeSingle()
 
     if (existingPayment) {
@@ -100,15 +108,18 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────
     // 3. Fetch Target Invoice
     // ─────────────────────────────────────────
-    const { data: invoice } = await adminDb
+    const { data: invoiceRaw } = await (adminDb as any)
       .from("invoices")
       .select("*, business:businesses(*), client:clients(*)")
       .eq("id", invoiceId)
       .maybeSingle()
 
+    const invoice = invoiceRaw as any
+
     if (!invoice) {
       return NextResponse.json({ error: "Invoice not found for webhook" }, { status: 404 })
     }
+
 
     const amountPaidInPaise = eventEntity.amount || Math.round(Number(invoice.balance_due || invoice.total) * 100)
     const amountPaidInRupees = amountPaidInPaise / 100
@@ -118,7 +129,6 @@ export async function POST(request: NextRequest) {
     const isFullyPaid = newBalanceDue <= 0.01
 
     const nowIso = new Date().toISOString()
-    const todayDate = nowIso.split("T")[0]
 
     // ─────────────────────────────────────────
     // 4. Update Invoice Status & Paid Amount
@@ -137,33 +147,48 @@ export async function POST(request: NextRequest) {
     // ─────────────────────────────────────────
     // 5. Create Payment Transaction Record (Schema Aligned)
     // ─────────────────────────────────────────
-    const { data: payment } = await adminDb
+    const { data: payment, error: paymentInsertErr } = await adminDb
       .from("payments")
       .insert({
         invoice_id: invoice.id,
         business_id: invoice.business_id,
-        client_id: invoice.client_id || null,
         amount: amountPaidInRupees,
-        payment_mode: "razorpay",
-        payment_date: todayDate,
-        reference_number: razorpayPaymentId,
-        razorpay_payment_id: razorpayPaymentId,
+        payment_method: "razorpay",
+        razorpay_id: razorpayPaymentId,
         razorpay_order_id: eventEntity.order_id || null,
+        status: "completed",
+        paid_at: nowIso,
         notes: `Automated webhook settlement via Razorpay (${razorpayPaymentId})`,
       })
       .select()
       .single()
 
+    if (paymentInsertErr) {
+      console.error("Payment insert error in webhook:", paymentInsertErr)
+    }
+
     // ─────────────────────────────────────────
-    // 6. Generate Official Receipt Record
+    // 6. Generate Official Receipt Record (if table exists)
     // ─────────────────────────────────────────
     const receiptNo = `RCPT-${invoice.invoice_number}-${Date.now().toString().slice(-4)}`
-    await adminDb.from("payment_receipts").insert({
+    try {
+      await adminDb.from("payment_receipts").insert({
+        business_id: invoice.business_id,
+        payment_id: payment?.id || null,
+        invoice_id: invoice.id,
+        receipt_number: receiptNo,
+        sent_at: nowIso,
+      })
+    } catch (_) {
+      // Optional table fallback
+    }
+
+    // Log to activity_logs
+    await adminDb.from("activity_logs").insert({
       business_id: invoice.business_id,
-      payment_id: payment?.id || null,
-      invoice_id: invoice.id,
-      receipt_number: receiptNo,
-      sent_at: nowIso,
+      type: "payment_received",
+      description: `Received online payment of ${amountPaidInRupees} for invoice #${invoice.invoice_number} via Razorpay.`,
+      metadata: { invoice_id: invoice.id, razorpay_id: razorpayPaymentId, amount: amountPaidInRupees }
     })
 
     // ─────────────────────────────────────────

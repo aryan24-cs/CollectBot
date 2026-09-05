@@ -21,7 +21,7 @@ export default function AdminTopBar() {
   const [searchValue, setSearchValue] = React.useState("")
 
   React.useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       if (session?.user) {
         const user = session.user
         const name = user.user_metadata?.full_name || user.email?.split("@")[0] || "Admin"

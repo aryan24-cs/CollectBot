@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     // If employee logged it, register an approval request
     if (!isOwner && employee) {
-      const { data: approvalRequest, error: appError } = await adminDb
+      await adminDb
         .from("approval_requests")
         .insert({
           business_id: business.id,
@@ -92,16 +92,6 @@ export async function POST(request: NextRequest) {
           target_id: expense.id,
           status: "pending",
         })
-        .select()
-        .single()
-
-      if (!appError && approvalRequest) {
-        await adminDb.from("approval_steps").insert({
-          approval_request_id: approvalRequest.id,
-          step_order: 1,
-          status: "pending",
-        })
-      }
     }
 
     // Log activity

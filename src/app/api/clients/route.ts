@@ -17,11 +17,11 @@ export async function POST(request: NextRequest) {
 
     const clientData = validation.data
 
-    // Phone parsing: strip +91 or 0 prefix if present, keep exactly 10 digits
-    let cleanedPhone = clientData.phone.replace(/\s+/g, "")
-    if (cleanedPhone.startsWith("+91")) {
-      cleanedPhone = cleanedPhone.substring(3)
-    } else if (cleanedPhone.startsWith("0")) {
+    // Phone parsing: strip spaces, dashes, parentheses and country/zero prefixes to retain 10 digits
+    let cleanedPhone = clientData.phone.replace(/[\s\-\(\)\+]/g, "")
+    if (cleanedPhone.length === 12 && cleanedPhone.startsWith("91")) {
+      cleanedPhone = cleanedPhone.substring(2)
+    } else if (cleanedPhone.length === 11 && cleanedPhone.startsWith("0")) {
       cleanedPhone = cleanedPhone.substring(1)
     }
 

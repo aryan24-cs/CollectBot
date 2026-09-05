@@ -7,7 +7,7 @@ export async function generateReceipt(invoiceId: string): Promise<string> {
   const supabase = getSupabaseServiceRoleClient()
 
   // 1. Fetch full details (bypass RLS as this is server-only context)
-  const { data: invoice, error: fetchError } = await supabase
+  const { data: invoiceRaw, error: fetchError } = await (supabase as any)
     .from("invoices")
     .select(`
       *,
@@ -17,6 +17,8 @@ export async function generateReceipt(invoiceId: string): Promise<string> {
     `)
     .eq("id", invoiceId)
     .maybeSingle()
+
+  const invoice = invoiceRaw as any
 
   if (fetchError || !invoice) {
     throw new Error(`Invoice not found during receipt generation: ${fetchError?.message || "Record missing"}`)
@@ -33,13 +35,12 @@ export async function generateReceipt(invoiceId: string): Promise<string> {
       }) as any
     ) as Buffer
   } catch (renderError: any) {
-    console.error("React-pdf renderToBuffer failed:", renderError)
-    throw new Error(`Receipt rendering failed: ${renderError.message}`)
+    console.error("PDF Receipt generation failed:", renderError)
+    throw new Error(`PDF Render error: ${renderError?.message || "Unknown error"}`)
   }
 
-  // 3. Upload to Supabase Storage (invoices bucket: invoices/{business_id}/{invoice_id}.pdf)
-  // Overwriting the invoice URL allows the client's link to show the Paid Receipt
-  const fileName = `invoices/${invoice.business.id}/${invoice.id}.pdf`
+  // 3. Upload to Supabase Storage
+  const fileName = `receipt-${invoice.invoice_number}-${Date.now()}.pdf`
   const { error: uploadError } = await supabase.storage
     .from("invoices")
     .upload(fileName, pdfBuffer, {
@@ -57,15 +58,11 @@ export async function generateReceipt(invoiceId: string): Promise<string> {
     .getPublicUrl(fileName)
 
   // 5. Update invoice record
-  const updatePayload: Record<string, any> = {
-    pdf_url: publicUrl,
-    receipt_url: publicUrl,
-  }
-
-  const { error: updateError } = await supabase
+  const { error: updateError } = await (supabase as any)
     .from("invoices")
-    .update(updatePayload)
+    .update({ pdf_url: publicUrl })
     .eq("id", invoiceId)
+
 
   if (updateError) {
     console.error("Failed to update invoice URLs after receipt upload:", updateError.message)

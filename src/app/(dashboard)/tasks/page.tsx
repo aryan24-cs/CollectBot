@@ -29,7 +29,7 @@ interface Task {
   id: string
   title: string
   description: string | null
-  status: "todo" | "in_progress" | "review" | "done"
+  status: "todo" | "in_progress" | "completed"
   due_date: string | null
   created_at: string
   assignee?: { id: string; name: string } | null
@@ -38,8 +38,7 @@ interface Task {
 const TASK_STATUSES = [
   { id: "todo", label: "To Do", bg: "bg-cream-100 text-ink-primary border-[#EEE9E4]" },
   { id: "in_progress", label: "In Progress", bg: "bg-blue-50 text-blue-700 border-blue-200" },
-  { id: "review", label: "Under Review", bg: "bg-amber-50 text-amber-700 border-amber-200" },
-  { id: "done", label: "Completed", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+  { id: "completed", label: "Completed", bg: "bg-emerald-50 text-emerald-700 border-emerald-200" }
 ]
 
 export default function TasksPage() {
@@ -165,7 +164,7 @@ export default function TasksPage() {
           <p className="text-xs text-ink-secondary font-bold uppercase tracking-wider">Loading project boards…</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {TASK_STATUSES.map((board) => {
             const boardTasks = tasks.filter(t => t.status === board.id)
             return (

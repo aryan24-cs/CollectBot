@@ -32,7 +32,7 @@ export default async function PublicPaymentPage({
   const supabase = getSupabaseServiceRoleClient()
 
   // Fetch invoice details using service role client
-  const { data: invoice, error: fetchError } = await supabase
+  const { data: invoiceRaw, error: fetchError } = await (supabase as any)
     .from("invoices")
     .select(`
       *,
@@ -42,6 +42,9 @@ export default async function PublicPaymentPage({
     `)
     .eq("id", invoiceId)
     .maybeSingle()
+
+  const invoice = invoiceRaw as any
+
 
   if (fetchError || !invoice) {
     return (
@@ -59,14 +62,18 @@ export default async function PublicPaymentPage({
 
   const { business, client, items } = invoice
 
-  // Fetch custom branding if available
-  const { data: branding } = await supabase
-    .from("invoice_branding")
-    .select("*")
-    .eq("business_id", business.id)
-    .maybeSingle()
+  // Use business branding with fallback
+  let branding: any = null
+  try {
+    const { data: bData } = await supabase
+      .from("invoice_branding")
+      .select("*")
+      .eq("business_id", business.id)
+      .maybeSingle()
+    branding = bData
+  } catch (_) {}
 
-  const primaryColor = branding?.primary_color || "#1A1A1A"
+  const primaryColor = branding?.primary_color || business?.primary_color || "#1A1A1A"
   const accentColor = branding?.accent_color || "#E91E63"
   const showBadge = branding?.show_collectbot_badge !== false
 
@@ -78,11 +85,13 @@ export default async function PublicPaymentPage({
       .update({ viewed_at: invoice.viewed_at || nowStr, status: invoice.status === "sent" ? "viewed" : invoice.status })
       .eq("id", invoiceId)
 
-    await supabase.from("client_portal_events").insert({
-      business_id: business.id,
-      invoice_id: invoiceId,
-      event_type: "viewed"
-    })
+    try {
+      await supabase.from("client_portal_events").insert({
+        business_id: business.id,
+        invoice_id: invoiceId,
+        event_type: "viewed"
+      })
+    } catch (_) {}
   }
 
   const daysOverdue = getDaysOverdue(invoice.due_date)

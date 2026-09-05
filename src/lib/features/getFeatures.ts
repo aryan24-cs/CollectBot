@@ -82,7 +82,7 @@ export async function getBusinessFeatures(
 ): Promise<BusinessFeatures> {
   const supabase = getSupabaseServiceRoleClient()
 
-  const { data, error } = await supabase.rpc("get_business_features", {
+  const { data, error } = await (supabase as any).rpc("get_business_features", {
     p_business_id: businessId,
   })
 

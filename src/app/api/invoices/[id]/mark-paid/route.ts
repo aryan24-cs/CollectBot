@@ -53,10 +53,10 @@ export async function POST(
       .insert({
         invoice_id: id,
         business_id: business.id,
-        client_id: invoice.client_id || null,
         amount: parsedAmount,
-        payment_mode: paymentMode,
-        payment_date: paidAt.split("T")[0],
+        payment_method: paymentMode,
+        status: "completed",
+        paid_at: paidAt,
         notes: paymentNotes,
       })
       .select()

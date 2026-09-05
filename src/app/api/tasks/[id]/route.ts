@@ -31,7 +31,10 @@ export async function PUT(
     const updates: any = {}
     if (title !== undefined) updates.title = title
     if (description !== undefined) updates.description = description || null
-    if (status !== undefined) updates.status = status
+    if (status !== undefined) {
+      const validStatuses = ["todo", "in_progress", "completed"]
+      updates.status = validStatuses.includes(status) ? status : "todo"
+    }
     if (due_date !== undefined) updates.due_date = due_date || null
     if (assignee_id !== undefined) updates.assignee_id = assignee_id || null
 

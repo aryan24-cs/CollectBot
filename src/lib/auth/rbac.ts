@@ -4,30 +4,43 @@ import { NextResponse } from "next/server"
 export async function verifyUserPermission(
   userId: string,
   category: string,
-  action: string
+  action: string,
+  businessId?: string
 ): Promise<boolean> {
   const supabase = getSupabaseServiceRoleClient()
 
   // 1. Check if user is the direct owner of the business
-  const { data: business } = await supabase
+  let bizQuery = supabase
     .from("businesses")
     .select("id")
     .eq("user_id", userId)
-    .maybeSingle()
 
-  if (business) {
-    return true; // Business Owner has unrestricted access to everything
+  if (businessId) {
+    bizQuery = bizQuery.eq("id", businessId)
   }
 
-  // 2. Check if user is an active employee
-  const { data: employee } = await supabase
-    .from("employees")
-    .select("id, status, custom_role_id")
-    .eq("user_id", userId)
-    .maybeSingle()
+  const { data: business } = await bizQuery.maybeSingle()
 
-  if (!employee || employee.status !== "active") {
-    return false; // Not a registered active employee
+  if (business) {
+    return true // Business Owner has unrestricted access to their business
+  }
+
+  // 2. Check if user is an active employee of this business
+  let empQuery = supabase
+    .from("employees")
+    .select("id, status, custom_role_id, business_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+
+  if (businessId) {
+    empQuery = empQuery.eq("business_id", businessId)
+  }
+
+  const { data: employeeRaw } = await empQuery.maybeSingle()
+  const employee = employeeRaw as any
+
+  if (!employee) {
+    return false // Not a registered active employee
   }
 
   // 3. Check role permissions
@@ -41,7 +54,7 @@ export async function verifyUserPermission(
       .maybeSingle()
 
     if (rolePerm) {
-      return true;
+      return true
     }
   }
 
@@ -55,14 +68,19 @@ export async function verifyUserPermission(
     .maybeSingle()
 
   if (empPerm) {
-    return true;
+    return true
   }
 
-  return false;
+  return false
 }
 
-export async function requirePermission(category: string, action: string, userId: string) {
-  const hasPermission = await verifyUserPermission(userId, category, action)
+export async function requirePermission(
+  category: string,
+  action: string,
+  userId: string,
+  businessId?: string
+) {
+  const hasPermission = await verifyUserPermission(userId, category, action, businessId)
   if (!hasPermission) {
     return {
       error: NextResponse.json(

@@ -115,24 +115,32 @@ export async function POST(request: NextRequest) {
       outputContent = [headers.join(","), ...rows].join("\n")
     }
 
-    // 3. Log Export Job
-    await adminDb.from("export_jobs").insert({
-      business_id: business.id,
-      format,
-      entity_type,
-      filters: { startDate, endDate, status },
-      item_count: invoiceList.length,
-      status: "completed",
-      created_by: user.id
-    })
+    // 3. Log Export Job (safely if table exists)
+    try {
+      await adminDb.from("export_jobs").insert({
+        business_id: business.id,
+        format,
+        entity_type,
+        filters: { startDate, endDate, status },
+        item_count: invoiceList.length,
+        status: "completed",
+        created_by: user.id
+      })
+    } catch (_) {
+      // export_jobs is an optional audit log table; ignore if not migrated
+    }
 
     // Log Activity
-    await adminDb.from("activity_logs").insert({
-      business_id: business.id,
-      type: "data_exported",
-      description: `Exported ${invoiceList.length} ${entity_type} records as ${format.toUpperCase()}.`,
-      metadata: { format, count: invoiceList.length }
-    })
+    try {
+      await adminDb.from("activity_logs").insert({
+        business_id: business.id,
+        type: "data_exported",
+        description: `Exported ${invoiceList.length} ${entity_type} records as ${format.toUpperCase()}.`,
+        metadata: { format, count: invoiceList.length }
+      })
+    } catch (e) {
+      console.error("Failed to log activity for export:", e)
+    }
 
     return new NextResponse(outputContent, {
       status: 200,

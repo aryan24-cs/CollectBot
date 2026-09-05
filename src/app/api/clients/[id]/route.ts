@@ -102,10 +102,10 @@ export async function PUT(
     }
 
     const clientData = validation.data
-    let cleanedPhone = clientData.phone.replace(/\s+/g, "")
-    if (cleanedPhone.startsWith("+91")) {
-      cleanedPhone = cleanedPhone.substring(3)
-    } else if (cleanedPhone.startsWith("0")) {
+    let cleanedPhone = clientData.phone.replace(/[\s\-\(\)\+]/g, "")
+    if (cleanedPhone.length === 12 && cleanedPhone.startsWith("91")) {
+      cleanedPhone = cleanedPhone.substring(2)
+    } else if (cleanedPhone.length === 11 && cleanedPhone.startsWith("0")) {
       cleanedPhone = cleanedPhone.substring(1)
     }
 

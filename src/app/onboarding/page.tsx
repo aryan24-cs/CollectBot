@@ -199,13 +199,19 @@ export default function OnboardingPage() {
             ifsc_code: business.ifsc_code || "",
           })
 
-          // Set default step based on filled fields
-          if (business.upi_id && business.bank_name) {
+          // Set default step based on actual completion
+          const hasBasicDetails = Boolean(business.name && business.phone && business.city)
+          const hasTaxDetails = Boolean(business.gstin || business.pan)
+          const hasPaymentDetails = Boolean(business.upi_id || (business.bank_name && business.account_number))
+
+          if (hasPaymentDetails) {
             setCurrentStep(4)
-          } else if (business.invoice_prefix) {
+          } else if (hasTaxDetails) {
             setCurrentStep(3)
-          } else if (business.phone) {
+          } else if (hasBasicDetails) {
             setCurrentStep(2)
+          } else {
+            setCurrentStep(1)
           }
         }
       } catch (err: any) {
@@ -220,25 +226,45 @@ export default function OnboardingPage() {
   }, [supabase, router, form1, form2, form3])
 
   const onStep1Submit = async (values: z.infer<typeof step1Schema>) => {
-    if (!businessId) return
     setSaving(true)
     setDbError(null)
     try {
-      const { error } = await supabase
-        .from("businesses")
-        .update({
-          name: values.name,
-          logo_url: values.businessType,
-          email: values.email,
-          phone: values.phone,
-          address: values.address,
-          city: values.city,
-          state: values.state,
-          pincode: values.pincode,
+      if (!businessId) {
+        const res = await fetch("/api/settings/business", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: values.name,
+            businessType: values.businessType,
+            email: values.email,
+            phone: values.phone,
+            address: values.address,
+            city: values.city,
+            state: values.state,
+            pincode: values.pincode,
+          }),
         })
-        .eq("id", businessId)
 
-      if (error) throw error
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Failed to create business profile.")
+        setBusinessId(data.business.id)
+      } else {
+        const { error } = await supabase
+          .from("businesses")
+          .update({
+            name: values.name,
+            logo_url: values.businessType,
+            email: values.email,
+            phone: values.phone,
+            address: values.address,
+            city: values.city,
+            state: values.state,
+            pincode: values.pincode,
+          })
+          .eq("id", businessId)
+
+        if (error) throw error
+      }
       setCurrentStep(2)
     } catch (err: any) {
       setDbError(err.message || "Failed to save details.")
@@ -295,6 +321,9 @@ export default function OnboardingPage() {
   }
 
   const completeOnboarding = () => {
+    if (businessId) {
+      document.cookie = `cb_active_business_id=${businessId}; path=/; max-age=${60 * 60 * 24 * 30}; SameSite=Lax`
+    }
     router.push("/dashboard")
     router.refresh()
   }

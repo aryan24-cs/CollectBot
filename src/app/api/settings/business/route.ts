@@ -154,3 +154,76 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: err.message || "Failed to update profile settings." }, { status: 500 })
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await getSupabaseServerClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { name, email, phone, address, city, state, pincode, businessType } = body
+
+    if (!name || name.trim().length < 2) {
+      return NextResponse.json({ error: "Business name must be at least 2 characters" }, { status: 400 })
+    }
+
+    const adminDb = getSupabaseServiceRoleClient()
+
+    // Create the business record
+    const { data: business, error: insertError } = await adminDb
+      .from("businesses")
+      .insert({
+        user_id: user.id,
+        name: name.trim(),
+        email: email || user.email || null,
+        phone: phone || null,
+        address: address || null,
+        city: city || null,
+        state: state || null,
+        pincode: pincode || null,
+        logo_url: businessType || null,
+      })
+      .select()
+      .single()
+
+    if (insertError) throw insertError
+
+    // Initialize free subscription
+    await adminDb
+      .from("subscriptions")
+      .insert({
+        business_id: business.id,
+        plan: "free",
+        plan_name: "free",
+        billing_cycle: "monthly",
+        status: "active",
+      })
+
+    // Log activity
+    await adminDb.from("activity_logs").insert({
+      business_id: business.id,
+      type: "business_created",
+      description: `Business workspace "${name}" created.`,
+      metadata: { business_id: business.id }
+    })
+
+    const response = NextResponse.json({ success: true, business }, { status: 201 })
+
+    // Set active business cookie
+    response.cookies.set("cb_active_business_id", business.id, {
+      path: "/",
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30,
+    })
+
+    return response
+  } catch (err: any) {
+    console.error("POST /api/settings/business error:", err)
+    return NextResponse.json({ error: err.message || "Failed to create business." }, { status: 500 })
+  }
+}
