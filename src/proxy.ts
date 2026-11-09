@@ -8,10 +8,55 @@ export async function proxy(request: NextRequest) {
   const isApiRoute = path.startsWith("/api/")
 
   // ─────────────────────────────────────────
+  // CORS & Origin Security Guard
+  // ─────────────────────────────────────────
+  const origin = request.headers.get("origin")
+  const isAllowedOrigin = (orig: string | null): boolean => {
+    if (!orig) return true
+    try {
+      const url = new URL(orig)
+      const allowedHosts = ["localhost", "127.0.0.1", "collectbot.in", "www.collectbot.in"]
+      if (process.env.NEXT_PUBLIC_APP_URL) {
+        try {
+          allowedHosts.push(new URL(process.env.NEXT_PUBLIC_APP_URL).hostname)
+        } catch (_) {}
+      }
+      return allowedHosts.some((h) => url.hostname === h || url.hostname.endsWith("." + h))
+    } catch (_) {
+      return false
+    }
+  }
+
+  if (isApiRoute && request.method === "OPTIONS") {
+    if (origin && !isAllowedOrigin(origin)) {
+      return new NextResponse(null, { status: 403 })
+    }
+    return new NextResponse(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": origin || "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-razorpay-signature, x-client-info",
+        "Access-Control-Max-Age": "86400",
+      },
+    })
+  }
+
+  // ─────────────────────────────────────────
   // 1. PUBLIC ROUTES (Zero-Overhead Bypass)
   // ─────────────────────────────────────────
   const publicRoutes = ["/", "/pricing", "/about", "/contact", "/privacy", "/refund", "/terms"]
-  const publicPrefixes = ["/pay/", "/api/webhooks/", "/api/health/", "/api/auth/callback", "/api/auth/route-user"]
+  const publicPrefixes = [
+    "/pay/",
+    "/api/pay/",
+    "/api/payments/verify",
+    "/api/payments/create-order",
+    "/api/webhooks/",
+    "/api/health/",
+    "/api/auth/callback",
+    "/api/auth/route-user",
+    "/api/employees/join",
+  ]
 
   const isPublic =
     publicRoutes.includes(path) ||
@@ -122,6 +167,7 @@ export async function proxy(request: NextRequest) {
         path: "/",
         httpOnly: false,
         sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
         maxAge: 60 * 60 * 24 * 30,
       })
     }

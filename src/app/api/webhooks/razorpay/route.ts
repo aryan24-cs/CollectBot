@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
     const { data: existingPayment } = await adminDb
       .from("payments")
       .select("id")
-      .eq("razorpay_id", razorpayPaymentId)
+      .eq("razorpay_payment_id", razorpayPaymentId)
       .maybeSingle()
 
     if (existingPayment) {
@@ -152,12 +152,12 @@ export async function POST(request: NextRequest) {
       .insert({
         invoice_id: invoice.id,
         business_id: invoice.business_id,
+        client_id: invoice.client_id || invoice.client?.id || null,
         amount: amountPaidInRupees,
-        payment_method: "razorpay",
-        razorpay_id: razorpayPaymentId,
+        payment_mode: "razorpay",
+        payment_date: nowIso.slice(0, 10),
+        razorpay_payment_id: razorpayPaymentId,
         razorpay_order_id: eventEntity.order_id || null,
-        status: "completed",
-        paid_at: nowIso,
         notes: `Automated webhook settlement via Razorpay (${razorpayPaymentId})`,
       })
       .select()

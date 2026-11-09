@@ -59,10 +59,10 @@ export async function PUT(
 
       if (moveError) throw moveError
 
-      // 2. Archive source department
+      // 2. Remove source department after migrating members
       const { error: archiveError } = await adminDb
         .from("departments")
-        .update({ status: "archived", updated_at: new Date().toISOString() })
+        .delete()
         .eq("id", id)
 
       if (archiveError) throw archiveError
@@ -82,9 +82,6 @@ export async function PUT(
     const updates: any = {}
     if (name !== undefined) updates.name = name
     if (description !== undefined) updates.description = description || null
-    if (status !== undefined && ["active", "archived"].includes(status)) updates.status = status
-
-    updates.updated_at = new Date().toISOString()
 
     const { data: department, error: updateError } = await adminDb
       .from("departments")

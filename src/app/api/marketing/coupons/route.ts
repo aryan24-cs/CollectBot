@@ -47,18 +47,19 @@ export async function POST(request: NextRequest) {
 
     const adminDb = getSupabaseServiceRoleClient()
 
+    // Normalize discount type to schema check constraint ('percentage' | 'fixed')
+    const normalizedType = discount_type === "percentage" ? "percentage" : "fixed"
+
     // Create coupon record
     const { data: coupon, error: insertError } = await adminDb
       .from("marketing_coupons")
       .insert({
         business_id: business.id,
         code: code.trim().toUpperCase(),
-        discount_type,
+        discount_type: normalizedType,
         discount_value: parseFloat(discount_value),
         expires_at: expires_at ? new Date(expires_at).toISOString() : null,
-        max_uses: max_uses ? parseInt(max_uses) : 0,
-        uses_count: 0,
-        created_by: user.id
+        max_uses: max_uses ? parseInt(max_uses) : null,
       })
       .select()
       .single()
@@ -69,8 +70,8 @@ export async function POST(request: NextRequest) {
     await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "coupon_created",
-      description: `Coupon "${code}" issued with value ${discount_value} (${discount_type}).`,
-      created_by: user.id
+      description: `Coupon "${code}" issued with value ${discount_value} (${normalizedType}).`,
+      metadata: { coupon_id: coupon.id },
     })
 
     return NextResponse.json({ success: true, coupon }, { status: 201 })

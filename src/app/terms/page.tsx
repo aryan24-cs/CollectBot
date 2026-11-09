@@ -1,5 +1,14 @@
+import type { Metadata } from "next"
 import * as React from "react"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "Review the terms and conditions governing the use of CollectBot's Business Operating System.",
+  alternates: {
+    canonical: "/terms",
+  },
+}
 
 export default function TermsOfServicePage() {
   return (

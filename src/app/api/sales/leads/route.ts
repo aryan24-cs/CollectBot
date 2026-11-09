@@ -95,19 +95,18 @@ export async function POST(request: NextRequest) {
         status: status || "new",
         value: value ? Number(value) : 0,
         assigned_to: assigned_to || employee?.id || null,
-        created_by: employee?.id || null,
       })
       .select()
       .single()
 
     if (insertError) throw insertError
 
-    // Initial pipeline entry
-    await adminDb.from("sales_pipeline").insert({
+    // Log activity
+    await adminDb.from("activity_logs").insert({
       business_id: business.id,
-      lead_id: lead.id,
-      stage: status || "new",
-      notes: "Lead registered in pipeline.",
+      type: "lead_created",
+      description: `Sales lead "${name}" was created.`,
+      metadata: { lead_id: lead.id, status: status || "new" },
     })
 
     return NextResponse.json({ success: true, lead }, { status: 201 })

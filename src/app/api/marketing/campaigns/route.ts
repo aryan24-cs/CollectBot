@@ -47,45 +47,30 @@ export async function POST(request: NextRequest) {
 
     const adminDb = getSupabaseServiceRoleClient()
 
-    // Create marketing campaign record
+    // Create marketing campaign record aligned with schema
     const { data: campaign, error: insertError } = await adminDb
       .from("marketing_campaigns")
       .insert({
         business_id: business.id,
         name,
         type,
-        status: scheduled_at ? "scheduled" : "sent",
+        status: scheduled_at ? "scheduled" : "completed",
         subject: subject || null,
         content,
         scheduled_at: scheduled_at ? new Date(scheduled_at).toISOString() : null,
         sent_at: scheduled_at ? null : new Date().toISOString(),
-        created_by: user.id
       })
       .select()
       .single()
 
     if (insertError) throw insertError
 
-    // Initialize mock analytics metrics for this campaign
-    await adminDb.from("marketing_analytics").insert({
-      business_id: business.id,
-      campaign_id: campaign.id,
-      sent_count: 250,
-      delivered_count: 242,
-      open_count: 148,
-      click_count: 42,
-      conversion_count: 12,
-      roi: 3.50,
-      revenue_generated: 15000.00,
-      created_by: user.id
-    })
-
     // Log general activity
     await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "campaign_launched",
       description: `Campaign "${name}" (${type}) launched by ${role.toLowerCase()}.`,
-      created_by: user.id
+      metadata: { campaign_id: campaign.id, type },
     })
 
     return NextResponse.json({ success: true, campaign }, { status: 201 })

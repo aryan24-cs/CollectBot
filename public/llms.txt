@@ -1,0 +1,35 @@
+# CollectBot — Business Operating System
+
+> One Business OS: Finance • Sales • Marketing.
+
+## Product Overview
+CollectBot is a multi-tenant Business Operating System (B2B SaaS) designed for modern businesses, freelancers, agencies, and enterprises to automate payment collections, invoicing, and business growth operations.
+
+## Core Capabilities
+- **Finance Automation:**
+  - Automated GST-compliant invoice generation (PDF receipts, recurring schedules).
+  - Multi-channel invoice follow-up dispatch (automated WhatsApp and Email reminders).
+  - Razorpay payment gateway integration with instant UPI QR & payment link checkouts.
+  - Automatic invoice reconciliation upon payment capture.
+  - Expense tracking and multi-tier approval workflows.
+  - Accounting ledger exports (Tally XML, Tally CSV, QuickBooks CSV, Excel CSV).
+- **Sales CRM:**
+  - Lead lifecycle tracking, pipeline stage visualization, win-rate projections.
+  - Deal follow-up scheduling (calls, meetings, demos) and task management.
+- **Marketing Automation:**
+  - Multi-channel campaign coordination (WhatsApp, Email, SMS).
+  - Discount coupon management (fixed amount and percentage discounts).
+  - Campaign conversion tracking.
+- **Multi-Tenant Workspace Architecture:**
+  - Single-identity multi-workplace authentication.
+  - Role-based departmental workspaces: Owner, Finance, Sales, Marketing.
+  - Platform-level Super Admin monitoring.
+  - Self-service Client Payment Portal (/pay/[invoiceId]).
+
+## Public Resources
+- Website: https://collectbot.in
+- Privacy Policy: https://collectbot.in/privacy
+- Terms of Service: https://collectbot.in/terms
+- Refund Policy: https://collectbot.in/refund
+- Contact: support@collectbot.in
+

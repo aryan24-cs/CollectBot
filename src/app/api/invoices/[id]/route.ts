@@ -22,8 +22,7 @@ export async function GET(
         client:clients(*),
         items:invoice_items(*),
         business:businesses(*),
-        payments:payments(*),
-        recurring_schedules:recurring_schedules(*)
+        payments:payments(*)
       `)
       .eq("id", id)
       .eq("business_id", business.id)

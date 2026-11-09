@@ -27,7 +27,7 @@ export async function GET(
           .eq("business_id", businessId),
         supabase
           .from("payments")
-          .select("id, amount, status, created_at")
+          .select("id, amount, payment_mode, created_at")
           .eq("business_id", businessId),
         supabase
           .from("clients")
@@ -49,7 +49,6 @@ export async function GET(
 
     const payments = paymentRes.data || []
     const totalRevenue = payments
-      .filter((p: any) => p.status === "captured" || p.status === "paid")
       .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0)
 
     return NextResponse.json({

@@ -48,22 +48,16 @@ export async function verifyAdminAccess(): Promise<{
       } catch (_) {}
     }
 
-    // Platform Super Admin Override Fallback
-    const fallbackAdmin: AdminUser = {
-      id: "63296a4b-1f35-4f03-8dcf-cbca90e8639d",
-      user_id: user?.id || "ae47bf84-5aed-45e9-8e84-9353774174e0",
-      email: user?.email || "aryan.nda.2163@gmail.com",
-      name: "Super Admin",
-      role: "super_admin",
-      is_active: true,
-      created_at: new Date().toISOString(),
-      last_login: new Date().toISOString(),
+    // Unauthenticated requests are strictly blocked
+    if (!user) {
+      return {
+        admin: null,
+        error: "Unauthorized: Super Admin access requires an authenticated session.",
+        status: 401,
+      }
     }
 
-    if (!user || user.email === "aryan.nda.2163@gmail.com") {
-      return { admin: fallbackAdmin, error: null, status: 200 }
-    }
-
+    // 1. Verify existence in admin_users table by user_id
     const { data: adminUser } = await serviceClient
       .from("admin_users")
       .select("*")
@@ -75,7 +69,42 @@ export async function verifyAdminAccess(): Promise<{
       return { admin: adminUser as AdminUser, error: null, status: 200 }
     }
 
-    return { admin: fallbackAdmin, error: null, status: 200 }
+    // 2. Verify existence in admin_users table by email
+    if (user.email) {
+      const { data: adminByEmail } = await serviceClient
+        .from("admin_users")
+        .select("*")
+        .ilike("email", user.email.trim())
+        .eq("is_active", true)
+        .maybeSingle()
+
+      if (adminByEmail) {
+        return { admin: adminByEmail as AdminUser, error: null, status: 200 }
+      }
+    }
+
+    // 3. Platform Root Super Admin designated by system configuration
+    const superAdminEmail = (process.env.SUPER_ADMIN_EMAIL || "aryan.nda.2163@gmail.com").toLowerCase().trim()
+    if (user.email && user.email.toLowerCase().trim() === superAdminEmail) {
+      const rootAdmin: AdminUser = {
+        id: user.id,
+        user_id: user.id,
+        email: user.email,
+        name: user.user_metadata?.full_name || "Super Admin",
+        role: "super_admin",
+        is_active: true,
+        created_at: new Date().toISOString(),
+        last_login: new Date().toISOString(),
+      }
+      return { admin: rootAdmin, error: null, status: 200 }
+    }
+
+    // User is authenticated, but not authorized for Super Admin
+    return {
+      admin: null,
+      error: "Forbidden: You do not possess Super Admin administrative privileges.",
+      status: 403,
+    }
   } catch (err) {
     console.error("Admin auth check failed:", err)
     return { admin: null, error: "Internal server error", status: 500 }
@@ -87,6 +116,7 @@ export async function logAdminAction(
     | string
     | {
         adminId?: string
+        adminEmail?: string
         action: string
         targetType?: string
         targetId?: string
@@ -105,26 +135,30 @@ export async function logAdminAction(
 
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
     let act = ""
-    let tType: string | null = null
+    let tType: string = "general"
     let tId: string | null = null
-    let aId = "63296a4b-1f35-4f03-8dcf-cbca90e8639d" // Fallback admin UUID for foreign key integrity
+    let aId: string | null = null
+    let adminEmail = "admin@collectbot.internal"
     let desc = "Admin action executed"
     let oldVal: any = null
     let newVal: any = null
 
     if (typeof actionOrObj === "object" && actionOrObj !== null) {
       act = actionOrObj.action || "admin_action"
-      tType = actionOrObj.targetType || null
+      tType = actionOrObj.targetType || "general"
       tId = actionOrObj.targetId ? String(actionOrObj.targetId) : null
       if (actionOrObj.adminId && UUID_REGEX.test(actionOrObj.adminId)) {
         aId = actionOrObj.adminId
+      }
+      if (actionOrObj.adminEmail) {
+        adminEmail = actionOrObj.adminEmail
       }
       desc = actionOrObj.description || `Admin performed ${act}`
       oldVal = actionOrObj.oldValue || null
       newVal = actionOrObj.newValue || actionOrObj.details || null
     } else {
       act = actionOrObj
-      tType = targetType || null
+      tType = targetType || "general"
       tId = targetId ? String(targetId) : null
       if (adminId && UUID_REGEX.test(adminId)) aId = adminId
       desc = `Admin action ${act} executed`
@@ -133,12 +167,12 @@ export async function logAdminAction(
 
     await supabase.from("admin_activity_logs").insert({
       admin_id: aId,
+      admin_email: adminEmail,
       action: act,
       target_type: tType,
       target_id: tId,
       description: desc,
-      old_value: oldVal,
-      new_value: newVal,
+      changes: newVal || oldVal ? { old: oldVal, new: newVal } : null,
       ip_address: "127.0.0.1",
     })
   } catch (err) {

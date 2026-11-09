@@ -19,11 +19,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Validate file type & size (max 2MB)
-    const allowedTypes = ["image/jpeg", "image/png", "image/svg+xml"]
-    if (!allowedTypes.includes(file.type)) {
+    // Validate file type & size (max 2MB, raster safe formats only)
+    const allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"]
+    if (!allowedMimeTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: "Invalid file type. Only JPG, PNG, and SVG are accepted." },
+        { error: "Invalid file type. Only secure raster images (JPG, PNG, WebP) are allowed." },
         { status: 400 }
       )
     }
@@ -36,9 +36,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Upload parameters
     const fileBuffer = Buffer.from(await file.arrayBuffer())
-    const fileExt = file.name.split(".").pop() || "png"
+
+    // Sanitize extension to prevent path traversal or double-extension attacks
+    const rawExt = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "")
+    const safeExtMap: Record<string, string> = {
+      jpg: "jpg",
+      jpeg: "jpg",
+      png: "png",
+      webp: "webp",
+    }
+    const fileExt = safeExtMap[rawExt] || "png"
     const filePath = `logos/${business.id}.${fileExt}`
 
     // Upload to invoices bucket (under logos/ subdirectory)

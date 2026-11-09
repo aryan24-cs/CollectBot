@@ -31,6 +31,7 @@ export async function GET(
       .from("invoices")
       .select("id, invoice_number, status, total, balance_due, due_date, paid_at, issue_date, created_at")
       .eq("client_id", id)
+      .eq("business_id", business.id)
       .order("created_at", { ascending: false })
 
     if (invoiceError) throw invoiceError
@@ -171,6 +172,7 @@ export async function DELETE(
       .from("invoices")
       .select("id")
       .eq("client_id", id)
+      .eq("business_id", business.id)
 
     const invoiceIds = (invoices || []).map((inv: any) => inv.id)
 

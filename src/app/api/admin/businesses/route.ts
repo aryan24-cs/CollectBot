@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       .from("businesses")
       .select(
         `id, name, created_at, updated_at,
-         subscriptions(plan_name, status, trial_ends_at, current_period_end)`,
+         subscriptions(plan_name, status, current_period_end)`,
         { count: "exact" }
       )
 
@@ -61,8 +61,7 @@ export async function GET(request: NextRequest) {
           supabase
             .from("payments")
             .select("amount")
-            .eq("business_id", biz.id)
-            .in("status", ["captured", "paid"]),
+            .eq("business_id", biz.id),
         ])
 
         const totalRevenue = (paymentRes.data || []).reduce(

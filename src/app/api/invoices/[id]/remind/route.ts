@@ -69,10 +69,11 @@ export async function POST(
         await adminDb.from("reminder_logs").insert({
           invoice_id: invoice.id,
           business_id: invoice.business.id,
-          reminder_type: "manual",
+          client_id: invoice.client_id || invoice.client?.id || null,
           channel: "email",
+          message_type: isOverdue ? "overdue_reminder" : "due_reminder",
           status: "sent",
-          message_content: `Manual reminder successfully sent to ${invoice.client.email}`,
+          phone_or_email: invoice.client.email,
         })
       } catch (mailErr: any) {
         console.error("Email reminder dispatch failed:", mailErr)

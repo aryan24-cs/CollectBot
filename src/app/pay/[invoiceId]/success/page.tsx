@@ -26,8 +26,8 @@ export default function PaymentSuccessPage() {
   React.useEffect(() => {
     async function verify() {
       try {
-        // Fetch invoice details first (public fetch)
-        const invoiceRes = await fetch(`/api/invoices/${invoiceId}`)
+        // Fetch invoice details first (public portal endpoint)
+        const invoiceRes = await fetch(`/api/pay/${invoiceId}`)
         if (!invoiceRes.ok) {
           throw new Error("Failed to retrieve invoice details.")
         }

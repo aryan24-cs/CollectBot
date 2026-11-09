@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
         business_id: business.id,
         name,
         description: description || null,
-        status: "active"
       })
       .select()
       .single()

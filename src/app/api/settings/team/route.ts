@@ -10,15 +10,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = getSupabaseServiceRoleClient()
-    const { data: members, error } = await supabase
-      .from("team_members")
-      .select("*")
+    const { data: employees, error } = await supabase
+      .from("employees")
+      .select("id, name, email, employee_type, designation, status, created_at")
       .eq("business_id", business.id)
       .order("created_at", { ascending: false })
 
     if (error) throw error
 
-    return NextResponse.json(members || [])
+    const team = (employees || []).map((e) => ({
+      id: e.id,
+      email: e.email,
+      name: e.name,
+      role: (e.employee_type || "FINANCE").toLowerCase(),
+      designation: e.designation,
+      status: e.status,
+      created_at: e.created_at,
+    }))
+
+    return NextResponse.json(team)
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "Failed to load team roster." }, { status: 500 })
   }
@@ -41,32 +51,39 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { email, role } = body
+    const { email, role, name } = body
 
-    if (!email || !role || !["owner", "manager", "viewer"].includes(role)) {
-      return NextResponse.json({ error: "Email and valid role are required." }, { status: 400 })
+    if (!email) {
+      return NextResponse.json({ error: "Email is required." }, { status: 400 })
     }
 
-    // Check if team member is already invited
+    const normalizedEmail = email.toLowerCase().trim()
+    const normalizedRole = (role || "finance").toUpperCase()
+    const employeeType = ["FINANCE", "SALES", "MARKETING"].includes(normalizedRole)
+      ? normalizedRole
+      : "FINANCE"
+
+    // Check if team member is already invited or exists in this workspace
     const { data: existing } = await supabase
-      .from("team_members")
+      .from("employees")
       .select("id")
       .eq("business_id", business.id)
-      .eq("email", email.toLowerCase())
+      .eq("email", normalizedEmail)
       .maybeSingle()
 
     if (existing) {
       return NextResponse.json({ error: "User is already invited or a member of the team." }, { status: 400 })
     }
 
-    // Create pending team member log
+    // Create employee record in employees table
     const { data: newMember, error: insertErr } = await supabase
-      .from("team_members")
+      .from("employees")
       .insert({
         business_id: business.id,
-        email: email.toLowerCase(),
-        role: role,
-        status: "pending",
+        email: normalizedEmail,
+        name: name || normalizedEmail.split("@")[0],
+        employee_type: employeeType,
+        status: "active",
       })
       .select()
       .single()

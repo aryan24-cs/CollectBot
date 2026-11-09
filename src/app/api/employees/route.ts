@@ -126,18 +126,23 @@ export async function POST(request: NextRequest) {
         designation: designation || null,
         employee_type: employee_type || "FINANCE",
         status: status || "active",
-        profile_picture_url: profile_picture_url || null,
-        notes: notes || null,
         department_id: department_id || null,
         custom_role_id: custom_role_id || null,
         branch_id: branch_id || null,
-        employee_id_code: employee_id_code || null,
-        created_by: user.id,
       })
       .select()
       .single()
 
     if (insertError) throw insertError
+
+    // If profile picture is provided, store in employee_profiles
+    if (profile_picture_url) {
+      await adminDb.from("employee_profiles").upsert({
+        business_id: business.id,
+        employee_id: employee.id,
+        avatar_url: profile_picture_url,
+      })
+    }
 
     // 4. Save permissions overrides if provided
     if (permissions && Array.isArray(permissions) && permissions.length > 0) {

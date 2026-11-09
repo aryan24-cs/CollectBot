@@ -1,5 +1,14 @@
+import type { Metadata } from "next"
 import * as React from "react"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "Privacy Policy",
+  description: "Learn how CollectBot collects, uses, and safeguards your financial, customer, and personal data.",
+  alternates: {
+    canonical: "/privacy",
+  },
+}
 
 export default function PrivacyPolicyPage() {
   return (

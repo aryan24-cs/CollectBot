@@ -1,8 +1,23 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { checkRateLimit, getClientIp, buildRateLimitResponse } from "@/lib/security/rateLimit"
 
 export async function POST(request: NextRequest) {
   try {
+    const clientIp = getClientIp(request)
+    const rateCheck = checkRateLimit(`order_create:${clientIp}`, {
+      limit: 15,
+      windowMs: 5 * 60 * 1000,
+    })
+    if (!rateCheck.allowed) {
+      return buildRateLimitResponse(
+        rateCheck.limit,
+        rateCheck.remaining,
+        rateCheck.retryAfterSeconds,
+        "Payment order rate limit reached. Please wait before attempting another payment checkout."
+      )
+    }
+
     const { invoiceId, partialAmount } = await request.json()
 
     if (!invoiceId) {

@@ -46,7 +46,6 @@ export async function PUT(
     }
 
     updates.updated_at = new Date().toISOString()
-    updates.updated_by = user.id
 
     const { data: lead, error: updateError } = await adminDb
       .from("sales_leads")
@@ -57,32 +56,23 @@ export async function PUT(
 
     if (updateError) throw updateError
 
-    // If stage/status changed, log to pipeline history
+    // If stage/status changed, log to activity logs
     if (status && status !== existingLead.status) {
-      await adminDb.from("sales_pipeline").insert({
-        business_id: business.id,
-        lead_id: id,
-        stage: status,
-        notes: notes || `Lead moved to stage: ${status}.`,
-        created_by: user.id
-      })
-
-      // Log general activity
       await adminDb.from("activity_logs").insert({
         business_id: business.id,
         type: "lead_stage_updated",
         description: `Lead "${lead.name}" stage updated to "${status}".`,
-        created_by: user.id
+        metadata: { lead_id: id, old_status: existingLead.status, new_status: status },
       })
     }
 
-    // Add note if content is supplied
+    // Add note if note content is supplied
     if (notes && notes.trim().length > 0) {
       await adminDb.from("sales_notes").insert({
         business_id: business.id,
         lead_id: id,
-        content: notes.trim(),
-        created_by: user.id
+        employee_id: employee?.id || null,
+        note: notes.trim(),
       })
     }
 

@@ -45,7 +45,31 @@ export default function SelectWorkspacePage() {
   const [loading, setLoading] = React.useState(true)
   const [selectingId, setSelectingId] = React.useState<string | null>(null)
 
-  const loadWorkspaces = async () => {
+  const handleSelectWorkspace = React.useCallback(
+    async (businessId: string, fallbackDestination?: string) => {
+      try {
+        setSelectingId(businessId)
+        const res = await fetch("/api/auth/switch-workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ businessId }),
+        })
+
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || "Failed to switch workspace")
+
+        toast.success(`Entering ${data.businessName || "Workspace"}`)
+        router.push(data.destination || fallbackDestination || "/dashboard")
+        router.refresh()
+      } catch (err: any) {
+        toast.error(err.message || "Failed to select workspace")
+        setSelectingId(null)
+      }
+    },
+    [router]
+  )
+
+  const loadWorkspaces = React.useCallback(async () => {
     try {
       setLoading(true)
       const res = await fetch("/api/auth/workspaces")
@@ -78,32 +102,11 @@ export default function SelectWorkspacePage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [handleSelectWorkspace, router])
 
   React.useEffect(() => {
     loadWorkspaces()
-  }, [])
-
-  const handleSelectWorkspace = async (businessId: string, fallbackDestination?: string) => {
-    try {
-      setSelectingId(businessId)
-      const res = await fetch("/api/auth/switch-workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ businessId }),
-      })
-
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || "Failed to switch workspace")
-
-      toast.success(`Entering ${data.businessName || "Workspace"}`)
-      router.push(data.destination || fallbackDestination || "/dashboard")
-      router.refresh()
-    } catch (err: any) {
-      toast.error(err.message || "Failed to select workspace")
-      setSelectingId(null)
-    }
-  }
+  }, [loadWorkspaces])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()

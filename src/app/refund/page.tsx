@@ -1,5 +1,14 @@
+import type { Metadata } from "next"
 import * as React from "react"
 import Link from "next/link"
+
+export const metadata: Metadata = {
+  title: "Refund & Cancellation Policy",
+  description: "Understand CollectBot's subscription cancellation, billing, and refund policy.",
+  alternates: {
+    canonical: "/refund",
+  },
+}
 
 export default function RefundPolicyPage() {
   return (

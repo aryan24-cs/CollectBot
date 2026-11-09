@@ -9,35 +9,30 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = getSupabaseServiceRoleClient()
 
-    // 1. Primary query with explicit foreign key relationship hint for PostgREST
-    let { data: expenses, error: expError } = await supabase
+    // 1. Fetch expenses for this business
+    const { data: rawExpenses, error: rawError } = await supabase
       .from("expenses")
-      .select("*, employee:employees!employee_id(id, name)")
+      .select("*")
       .eq("business_id", business.id)
       .order("date", { ascending: false })
 
-    // 2. Fallback to manual join if relational embedding fails
-    if (expError) {
-      console.warn("Expenses FK join query failed, falling back to manual join:", expError.message)
-      const { data: rawExpenses, error: rawError } = await supabase
-        .from("expenses")
-        .select("*")
-        .eq("business_id", business.id)
-        .order("date", { ascending: false })
+    if (rawError) throw rawError
 
-      if (rawError) throw rawError
+    // 2. Fetch employees for creator mapping
+    const { data: employees } = await supabase
+      .from("employees")
+      .select("id, name, email")
+      .eq("business_id", business.id)
 
-      const { data: employees } = await supabase
-        .from("employees")
-        .select("id, name")
-        .eq("business_id", business.id)
-
-      const empMap = new Map((employees || []).map((e) => [e.id, e]))
-      expenses = (rawExpenses || []).map((exp) => ({
+    const empMap = new Map((employees || []).map((e) => [e.id, e]))
+    const expenses = (rawExpenses || []).map((exp) => {
+      const creator = exp.creator_id ? empMap.get(exp.creator_id) || null : null
+      return {
         ...exp,
-        employee: exp.employee_id ? empMap.get(exp.employee_id) || null : null,
-      }))
-    }
+        creator,
+        employee: creator, // Backward compatibility for UI components expecting employee
+      }
+    })
 
     return NextResponse.json(expenses || [])
   } catch (err: any) {
@@ -68,13 +63,12 @@ export async function POST(request: NextRequest) {
       .from("expenses")
       .insert({
         business_id: business.id,
-        employee_id: employee?.id || null,
+        creator_id: employee?.id || null,
         category,
         amount: Number(amount),
         date,
         description: description || null,
         status,
-        approved_by: isOwner ? null : null,
       })
       .select()
       .single()
@@ -88,8 +82,8 @@ export async function POST(request: NextRequest) {
         .insert({
           business_id: business.id,
           requester_id: employee.id,
-          type: "expense",
-          target_id: expense.id,
+          entity_type: "expense",
+          entity_id: expense.id,
           status: "pending",
         })
     }
@@ -98,12 +92,13 @@ export async function POST(request: NextRequest) {
     await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "expense_created",
-      description: `Logged expense of ${amount} for "${category}" (status: ${status}).`,
-      metadata: { expense_id: expense.id },
+      description: `Expense of ₹${Number(amount).toLocaleString("en-IN")} logged under ${category}.`,
+      metadata: { expense_id: expense.id, status },
     })
 
     return NextResponse.json({ success: true, expense }, { status: 201 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to log expense" }, { status: 500 })
+    console.error("POST /api/expenses error:", err)
+    return NextResponse.json({ error: err.message || "Failed to create expense" }, { status: 500 })
   }
 }

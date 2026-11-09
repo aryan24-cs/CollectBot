@@ -5,6 +5,14 @@ import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { getUserWorkspaces } from "@/lib/auth/workspaces"
 import DashboardLayoutClient from "./layout-client"
 
+export const metadata = {
+  title: "Workspace Dashboard",
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
+
 export default async function DashboardLayout({
   children,
 }: {

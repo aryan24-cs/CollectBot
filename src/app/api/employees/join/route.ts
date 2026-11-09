@@ -28,19 +28,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Account has already been activated. Try logging in instead" }, { status: 400 })
     }
 
-    // 2. Create the auth user in Supabase auth
-    const { data: authUser, error: authError } = await adminDb.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { full_name: name }
-    })
+    // 2. Check if auth user already exists globally
+    let userId: string | null = null
+    const { data: userList } = await adminDb.auth.admin.listUsers()
+    const existingAuthUser = userList?.users?.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase().trim()
+    )
 
-    if (authError) {
-      return NextResponse.json({ error: authError.message || "Failed to register credentials" }, { status: 400 })
+    if (existingAuthUser) {
+      userId = existingAuthUser.id
+    } else {
+      // Create new user in Supabase auth
+      const { data: authUser, error: authError } = await adminDb.auth.admin.createUser({
+        email: email.toLowerCase().trim(),
+        password,
+        email_confirm: true,
+        user_metadata: { full_name: name },
+      })
+
+      if (authError) {
+        return NextResponse.json({ error: authError.message || "Failed to register credentials" }, { status: 400 })
+      }
+
+      userId = authUser.user?.id || null
     }
-
-    const userId = authUser.user?.id
 
     if (!userId) {
       throw new Error("Auth user ID generation failed")
@@ -53,8 +64,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         name,
         status: "active",
-        joined_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", invite.id)
 

@@ -20,7 +20,7 @@ export async function GET() {
     ] = await Promise.all([
       supabase.from("businesses").select("id, created_at", { count: "exact" }),
       supabase.from("invoices").select("id, total, status, created_at", { count: "exact" }),
-      supabase.from("payments").select("id, amount, status, created_at", { count: "exact" }),
+      supabase.from("payments").select("id, amount, created_at, payment_mode", { count: "exact" }),
       supabase.from("subscriptions").select("plan_name, status"),
       supabase
         .from("businesses")

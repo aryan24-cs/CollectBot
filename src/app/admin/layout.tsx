@@ -6,6 +6,14 @@ import AdminTopBar from "@/components/layout/AdminTopBar"
 
 export const dynamic = "force-dynamic"
 
+export const metadata = {
+  title: "Super Admin Platform",
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
+
 export default async function AdminLayout({
   children,
 }: {

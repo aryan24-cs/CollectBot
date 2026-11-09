@@ -22,8 +22,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Business profile not found" }, { status: 404 })
     }
 
-    const { planName } = await request.json()
-    if (!planName || !["free", "solo", "business", "scale"].includes(planName)) {
+    const { planName: rawPlanName } = await request.json()
+    const planAliasMap: Record<string, string> = {
+      solo: "starter",
+      business: "pro",
+      scale: "enterprise",
+      free: "free",
+      starter: "starter",
+      pro: "pro",
+      enterprise: "enterprise",
+    }
+
+    const planName = planAliasMap[(rawPlanName || "").toLowerCase().trim()]
+    if (!planName) {
       return NextResponse.json({ error: "Invalid plan name" }, { status: 400 })
     }
 
@@ -34,7 +45,7 @@ export async function POST(request: NextRequest) {
       .from("plans")
       .select("id, name")
       .eq("name", planName)
-      .single()
+      .maybeSingle()
 
     if (!planRecord) {
       return NextResponse.json({ error: "Selected plan not found" }, { status: 404 })
@@ -48,9 +59,7 @@ export async function POST(request: NextRequest) {
       .from("subscriptions")
       .upsert({
         business_id: business.id,
-        plan_id: planRecord.id,
         plan_name: planName,
-        plan: planName,
         billing_cycle: "monthly",
         status: "active",
         current_period_start: new Date().toISOString(),

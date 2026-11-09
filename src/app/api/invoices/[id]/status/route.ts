@@ -43,14 +43,14 @@ export async function POST(
         updates.balance_due = 0
         updates.paid_at = new Date().toISOString()
 
-        // 1. Create a payment record
+        // 1. Create a payment record aligned with schema
         const { error: payError } = await adminDb.from("payments").insert({
           invoice_id: id,
           business_id: business.id,
+          client_id: invoice.client_id || null,
           amount: Number(invoice.balance_due || invoice.total),
-          payment_method: "manual",
-          status: "success",
-          paid_at: new Date().toISOString(),
+          payment_date: new Date().toISOString().slice(0, 10),
+          payment_mode: "other",
           notes: "Marked as paid manually via status update",
         })
 

@@ -63,16 +63,12 @@ export async function PUT(
     if (phone !== undefined) updates.phone = phone || null
     if (department_id !== undefined) updates.department_id = department_id || null
     if (custom_role_id !== undefined) updates.custom_role_id = custom_role_id || null
-    if (employee_id_code !== undefined) updates.employee_id_code = employee_id_code || null
     if (branch_id !== undefined) updates.branch_id = branch_id || null
-    if (status !== undefined && ["pending", "active", "suspended"].includes(status)) updates.status = status
+    if (status !== undefined && ["active", "inactive", "suspended"].includes(status)) updates.status = status
     if (designation !== undefined) updates.designation = designation || null
-    if (employee_type !== undefined && ["OWNER", "FINANCE", "SALES", "MARKETING"].includes(employee_type)) updates.employee_type = employee_type
-    if (notes !== undefined) updates.notes = notes || null
-    if (profile_picture_url !== undefined) updates.profile_picture_url = profile_picture_url || null
+    if (employee_type !== undefined && ["FINANCE", "SALES", "MARKETING"].includes(employee_type)) updates.employee_type = employee_type
 
     updates.updated_at = new Date().toISOString()
-    updates.updated_by = user.id
 
     const { data: employee, error: updateError } = await adminDb
       .from("employees")
@@ -83,6 +79,14 @@ export async function PUT(
       .single()
 
     if (updateError) throw updateError
+
+    if (profile_picture_url) {
+      await adminDb.from("employee_profiles").upsert({
+        business_id: business.id,
+        employee_id: id,
+        avatar_url: profile_picture_url,
+      })
+    }
 
     // Sync direct overrides if provided
     if (permissions !== undefined && Array.isArray(permissions)) {

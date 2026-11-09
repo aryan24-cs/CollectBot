@@ -1,17 +1,33 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
 import { requireBusinessUser } from "@/lib/auth/checkRole"
+import { checkRateLimit, buildRateLimitResponse } from "@/lib/security/rateLimit"
 
 export async function POST(request: NextRequest) {
   const { error, user, business } = await requireBusinessUser(request)
   if (error) return error
 
+  // Rate Limiting: max 10 export generation runs per 5 minutes per business
+  const rateCheck = checkRateLimit(`exports:${business.id}`, {
+    limit: 10,
+    windowMs: 5 * 60 * 1000,
+  })
+  if (!rateCheck.allowed) {
+    return buildRateLimitResponse(
+      rateCheck.limit,
+      rateCheck.remaining,
+      rateCheck.retryAfterSeconds,
+      "Export generation rate limit reached. Please wait before generating another data export."
+    )
+  }
+
   try {
     const body = await request.json()
     const { format, entity_type, startDate, endDate, status } = body
 
-    if (!format || !entity_type) {
-      return NextResponse.json({ error: "Format and entity type are required." }, { status: 400 })
+    const validFormats = ["tally_xml", "tally_csv", "custom_csv", "quickbooks_csv", "excel_csv"]
+    if (!format || !validFormats.includes(format) || !entity_type) {
+      return NextResponse.json({ error: "Invalid or missing format and entity type parameters." }, { status: 400 })
     }
 
     const adminDb = getSupabaseServiceRoleClient()

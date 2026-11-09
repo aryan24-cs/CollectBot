@@ -26,17 +26,22 @@ export async function GET(request: NextRequest) {
     requests = (requests || []).map((req) => ({
       ...req,
       requester: req.requester_id ? empMap.get(req.requester_id) || null : null,
+      type: req.entity_type || req.type || "expense",
+      target_id: req.entity_id || req.target_id,
     }))
 
     // Enrich with target object details
     const enriched = await Promise.all(
       (requests || []).map(async (req: any) => {
         let targetDetails = null
-        if (req.type === "expense") {
+        const targetType = req.entity_type || req.type
+        const targetId = req.entity_id || req.target_id
+
+        if (targetType === "expense" && targetId) {
           const { data } = await supabase
             .from("expenses")
             .select("*")
-            .eq("id", req.target_id)
+            .eq("id", targetId)
             .maybeSingle()
           targetDetails = data
         }
@@ -52,15 +57,23 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { error, user, business, employee } = await requireBusinessUser(request)
+  const { error, user, business, employee, role } = await requireBusinessUser(request)
   if (error) return error
+
+  // Security guard: Only OWNER or FINANCE members can authorize approvals
+  if (role !== "OWNER" && role !== "FINANCE") {
+    return NextResponse.json(
+      { error: "Forbidden: Only workspace owners and finance members can approve or reject requests." },
+      { status: 403 }
+    )
+  }
 
   try {
     const body = await request.json()
     const { approval_request_id, action, comment } = body
 
-    if (!approval_request_id || !action) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
+    if (!approval_request_id || !action || !["approve", "reject"].includes(action)) {
+      return NextResponse.json({ error: "Missing or invalid required fields (approval_request_id, action)" }, { status: 400 })
     }
 
     const adminDb = getSupabaseServiceRoleClient()
@@ -82,34 +95,37 @@ export async function POST(request: NextRequest) {
     }
 
     const statusValue = action === "approve" ? "approved" : "rejected"
+    const targetType = appReq.entity_type || appReq.type || "expense"
+    const targetId = appReq.entity_id || appReq.target_id
 
-    // 3. Update overall request status
+    // 2. Update overall request status
     await adminDb
       .from("approval_requests")
       .update({
         status: statusValue,
+        approver_id: employee?.id || null,
+        notes: comment || null,
         updated_at: new Date().toISOString(),
       })
       .eq("id", approval_request_id)
 
-    // 4. Update target object status
-    if (appReq.type === "expense") {
+    // 3. Update target object status
+    if (targetType === "expense" && targetId) {
       await adminDb
         .from("expenses")
         .update({
           status: statusValue,
-          approved_by: employee?.id || null,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", appReq.target_id)
+        .eq("id", targetId)
     }
 
-    // 5. Log activity
+    // 4. Log activity
     await adminDb.from("activity_logs").insert({
       business_id: business.id,
       type: "approval_decision",
-      description: `Approval request for ${appReq.type} was ${statusValue}.`,
-      metadata: { approval_request_id, decision: statusValue },
+      description: `Approval request for ${targetType} was ${statusValue}.`,
+      metadata: { approval_request_id, decision: statusValue, approver: employee?.name || "Owner" },
     })
 
     return NextResponse.json({ success: true, status: statusValue })

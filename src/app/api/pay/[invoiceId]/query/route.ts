@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/serviceRole"
+import { checkRateLimit, getClientIp, buildRateLimitResponse } from "@/lib/security/rateLimit"
+import { verifyAntiBot } from "@/lib/security/antiBot"
 
 export async function POST(
   request: NextRequest,
@@ -7,11 +9,37 @@ export async function POST(
 ) {
   try {
     const { invoiceId } = await params
-    const body = await request.json()
-    const { message, email, phone } = body
+    const clientIp = getClientIp(request)
 
-    if (!message || message.trim().length === 0) {
+    // 1. Rate Limiting: max 5 queries per 10 minutes per IP/invoice
+    const rateCheck = checkRateLimit(`portal_query:${clientIp}:${invoiceId}`, {
+      limit: 5,
+      windowMs: 10 * 60 * 1000,
+    })
+    if (!rateCheck.allowed) {
+      return buildRateLimitResponse(
+        rateCheck.limit,
+        rateCheck.remaining,
+        rateCheck.retryAfterSeconds,
+        "Too many inquiries submitted. Please wait before submitting another query."
+      )
+    }
+
+    const body = await request.json()
+    const { message, email, phone, website_trap, rendered_at } = body
+
+    // 2. Anti-Bot Defense
+    const botCheck = verifyAntiBot({ website_trap, rendered_at })
+    if (!botCheck.isHuman) {
+      return NextResponse.json({ error: "Invalid submission." }, { status: 400 })
+    }
+
+    if (!message || typeof message !== "string" || message.trim().length === 0) {
       return NextResponse.json({ error: "Query message is required." }, { status: 400 })
+    }
+
+    if (message.length > 2000) {
+      return NextResponse.json({ error: "Query message exceeds 2,000 character limit." }, { status: 400 })
     }
 
     const adminDb = getSupabaseServiceRoleClient()
