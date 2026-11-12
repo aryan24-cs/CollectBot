@@ -19,10 +19,18 @@
 
 # production
 /build
+/dist
+/desktop/dist
 
 # misc
 .DS_Store
+# certificates and signing keys
 *.pem
+*.pfx
+*.p12
+*.key
+*.cer
+*.crt
 
 # debug
 npm-debug.log*

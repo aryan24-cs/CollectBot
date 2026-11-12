@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CollectBot — Offline</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #FAF8F5;
+      color: #1A1A1A;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+      user-select: none;
+    }
+    .card {
+      background: #FFFFFF;
+      border: 1px solid #EEE9E4;
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 440px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+    }
+    .icon-wrapper {
+      width: 64px;
+      height: 64px;
+      background: #FFF1F4;
+      border: 1px solid #FFE0E7;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      color: #E91E63;
+    }
+    .icon-wrapper svg {
+      width: 32px;
+      height: 32px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 9999px;
+      background: #F5F1EE;
+      color: #6B6B6B;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0A0A0A;
+      margin-bottom: 8px;
+    }
+    p {
+      font-size: 13px;
+      line-height: 1.5;
+      color: #6B6B6B;
+      margin-bottom: 28px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 9999px;
+      background: #E91E63;
+      color: #FFFFFF;
+      font-size: 13px;
+      font-weight: 700;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 12px rgba(233, 30, 99, 0.25);
+    }
+    .btn:hover {
+      background: #D81B60;
+      transform: translateY(-1px);
+    }
+    .btn:active {
+      transform: translateY(0);
+    }
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #8C8C8C;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #E53935;
+    }
+    .dot.reconnecting {
+      background: #FB8C00;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      from { opacity: 0.4; }
+      to { opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon-wrapper">
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 7.5h.008v.008H12v-.008Z" />
+      </svg>
+    </div>
+    <div class="badge">Connection Interrupted</div>
+    <h1>Unable to Connect to CollectBot</h1>
+    <p>Please check your internet connection or network settings. CollectBot will automatically attempt to reconnect once connectivity is restored.</p>
+    
+    <button id="retry-btn" class="btn" type="button">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+      </svg>
+      Reconnect / Try Again
+    </button>
+
+    <div class="status-indicator">
+      <span class="dot" id="status-dot"></span>
+      <span id="status-text">Offline</span>
+    </div>
+  </div>
+
+  <script>
+    const retryBtn = document.getElementById("retry-btn");
+    const statusDot = document.getElementById("status-dot");
+    const statusText = document.getElementById("status-text");
+
+    function attemptReconnect() {
+      statusDot.className = "dot reconnecting";
+      statusText.textContent = "Checking connection...";
+      retryBtn.disabled = true;
+
+      // Ask Electron to reload the target page or reload window location
+      if (window.collectbotAPI && typeof window.collectbotAPI.reloadApp === "function") {
+        window.collectbotAPI.reloadApp();
+      } else {
+        window.location.reload();
+      }
+    }
+
+    retryBtn.addEventListener("click", attemptReconnect);
+
+    // Auto-reconnect when OS reports online status
+    window.addEventListener("online", () => {
+      statusDot.className = "dot reconnecting";
+      statusText.textContent = "Internet detected. Reconnecting...";
+      setTimeout(attemptReconnect, 1000);
+    });
+
+    window.addEventListener("offline", () => {
+      statusDot.className = "dot";
+      statusText.textContent = "Offline";
+    });
+  </script>
+</body>
+</html>
+

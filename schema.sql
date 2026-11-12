@@ -1243,3 +1243,25 @@ BEGIN
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- ─────────────────────────────────────────────────────────────
+-- DESKTOP AUTHENTICATION TICKETS (Phase 3 Desktop OAuth Handoff)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS desktop_auth_tickets (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ticket_hash TEXT NOT NULL UNIQUE,
+    user_id UUID NOT NULL,
+    session_data JSONB NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    ip_address TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_desktop_auth_tickets_lookup 
+    ON desktop_auth_tickets (ticket_hash, expires_at) 
+    WHERE consumed_at IS NULL;
+
+ALTER TABLE desktop_auth_tickets ENABLE ROW LEVEL SECURITY;
+-- Strictly service-role access only; no anon or authenticated public policies
+

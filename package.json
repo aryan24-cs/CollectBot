@@ -1,13 +1,22 @@
 {
   "name": "collectbot",
-  "version": "0.1.0",
+  "version": "0.1.1-beta.1",
   "private": true,
+  "description": "CollectBot — One Business OS. Finance • Sales • Marketing",
+  "author": "CollectBot Technologies <support@collectbot.in>",
+  "homepage": "https://collectbot.in",
+  "main": "desktop/dist/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/**/*.test.mjs"
+    "test": "node --test tests/**/*.test.mjs",
+    "desktop:compile": "node desktop/build.mjs",
+    "desktop:build": "node desktop/build.mjs",
+    "desktop:dev": "node desktop/build.mjs && node desktop/dev-runner.mjs",
+    "desktop:start": "node desktop/build.mjs && electron desktop/dist/main.js",
+    "desktop:dist": "node desktop/build.mjs && electron-builder --win --x64"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
@@ -29,6 +38,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "electron-updater": "^6.8.11",
     "inngest": "^4.11.0",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
@@ -53,6 +63,10 @@
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "cross-env": "^10.1.0",
+    "electron": "^45.3.0",
+    "electron-builder": "^26.18.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",

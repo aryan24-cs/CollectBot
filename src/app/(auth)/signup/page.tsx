@@ -51,6 +51,17 @@ export default function SignupPage() {
     try {
       setIsGoogleLoading(true)
       setError(null)
+
+      // Desktop Environment: Delegate to system browser via secure deep-link handoff
+      if (typeof window !== "undefined" && (window as any).collectbotAPI?.isDesktop) {
+        const started = await (window as any).collectbotAPI.startGoogleAuth()
+        if (started) {
+          toast.info("Please complete Google Sign-Up in your browser...")
+          setIsGoogleLoading(false)
+          return
+        }
+      }
+
       const origin = typeof window !== "undefined" ? window.location.origin : "http://localhost:3000"
       
       const { error: oauthError } = await supabase.auth.signInWithOAuth({

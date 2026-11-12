@@ -15,7 +15,7 @@ export async function proxy(request: NextRequest) {
     if (!orig) return true
     try {
       const url = new URL(orig)
-      const allowedHosts = ["localhost", "127.0.0.1", "collectbot.in", "www.collectbot.in"]
+      const allowedHosts = ["localhost", "127.0.0.1", "collectbot.vercel.app", "collectbot.in", "www.collectbot.in"]
       if (process.env.NEXT_PUBLIC_APP_URL) {
         try {
           allowedHosts.push(new URL(process.env.NEXT_PUBLIC_APP_URL).hostname)
@@ -55,6 +55,7 @@ export async function proxy(request: NextRequest) {
     "/api/health/",
     "/api/auth/callback",
     "/api/auth/route-user",
+    "/api/auth/desktop",
     "/api/employees/join",
   ]
 

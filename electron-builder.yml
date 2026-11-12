@@ -1,0 +1,60 @@
+appId: in.collectbot.desktop
+productName: CollectBot
+copyright: "Copyright © 2026 CollectBot Technologies"
+
+npmRebuild: false
+nodeGypRebuild: false
+
+directories:
+  output: dist
+  buildResources: desktop/assets
+
+files:
+  - "desktop/dist/**/*"
+  - "desktop/assets/**/*"
+  - "package.json"
+  - "!node_modules/**/*"
+  - "!src/**/*"
+  - "!tests/**/*"
+  - "!docs/**/*"
+  - "!.github/**/*"
+  - "!.next/**/*"
+
+extraMetadata:
+  main: desktop/dist/main.js
+
+publish:
+  provider: github
+  owner: aryan24-cs
+  repo: CollectBot
+  private: false
+
+protocols:
+  - name: CollectBot Protocol
+    schemes:
+      - collectbot
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: desktop/assets/icon.ico
+  legalTrademarks: CollectBot Technologies
+  artifactName: "${productName}Setup-${version}-x64.${ext}"
+  executableName: CollectBot
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  allowElevation: true
+  createDesktopShortcut: "always"
+  createStartMenuShortcut: true
+  shortcutName: CollectBot
+  deleteAppDataOnUninstall: false
+  installerIcon: desktop/assets/icon.ico
+  uninstallerIcon: desktop/assets/icon.ico
+  installerHeaderIcon: desktop/assets/icon.ico
+  uninstallDisplayName: "${productName}"
+  runAfterFinish: true

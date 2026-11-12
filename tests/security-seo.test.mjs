@@ -49,12 +49,12 @@ class MemoryRateLimiter {
 
 // 3. Sitemap & Robots Contract
 const PUBLIC_SITEMAP_URLS = [
-  "https://collectbot.in",
-  "https://collectbot.in/signup",
-  "https://collectbot.in/login",
-  "https://collectbot.in/privacy",
-  "https://collectbot.in/terms",
-  "https://collectbot.in/refund",
+  "https://collectbot.vercel.app",
+  "https://collectbot.vercel.app/signup",
+  "https://collectbot.vercel.app/login",
+  "https://collectbot.vercel.app/privacy",
+  "https://collectbot.vercel.app/terms",
+  "https://collectbot.vercel.app/refund",
 ]
 
 const ROBOTS_RULES = {
@@ -135,7 +135,7 @@ describe("CollectBot Security & Anti-Abuse Engine Tests", () => {
 describe("CollectBot SEO & Crawling Verification Tests", () => {
   test("Sitemap strictly includes public pages and excludes all private application paths", () => {
     // Must include public landing, auth, and legal pages
-    assert.ok(PUBLIC_SITEMAP_URLS.some((u) => u === "https://collectbot.in"))
+    assert.ok(PUBLIC_SITEMAP_URLS.some((u) => u === "https://collectbot.vercel.app"))
     assert.ok(PUBLIC_SITEMAP_URLS.some((u) => u.includes("/privacy")))
     assert.ok(PUBLIC_SITEMAP_URLS.some((u) => u.includes("/terms")))
     assert.ok(PUBLIC_SITEMAP_URLS.some((u) => u.includes("/refund")))
