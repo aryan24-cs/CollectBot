@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server"
-import getSupabaseBrowserClient from "@/lib/supabase/client"
+import { createClient } from "@supabase/supabase-js"
 import { checkRateLimit, getClientIp, buildRateLimitResponse } from "@/lib/security/rateLimit"
 
 function getTrustedOrigin(request: NextRequest): string {
@@ -35,7 +35,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = getSupabaseBrowserClient()
+    const rawUrl = (process.env.NEXT_PUBLIC_SUPABASE_URL || "https://faoetyzqzqqtwatflefk.supabase.co").trim().replace(/^["']|["']$/g, "")
+    const rawKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZhb2V0eXpxenFxdHdhdGZsZWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjUxMTYsImV4cCI6MjA5OTE0MTExNn0.iXGvbxN7wz0UgkkBU48uPxRmskJ6QpKBjsH_7YcUA18").trim().replace(/^["']|["']$/g, "")
+
+    const supabase = createClient(rawUrl, rawKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
 
     // Initiate Google OAuth with desktop state passed through to callback
     const { data, error } = await supabase.auth.signInWithOAuth({
